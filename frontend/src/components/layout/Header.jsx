@@ -9,7 +9,7 @@ export default function Header() {
         </span>
         <div>
           <p className="site-header__name">{BUSINESS_NAME}</p>
-          <p className="site-header__tagline">Support Assistant</p>
+          <p className="site-header__tagline"></p>
         </div>
       </div>
     </header>

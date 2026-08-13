@@ -1,4 +1,4 @@
-export const BUSINESS_NAME = "Serenity Salon & Spa";
+export const BUSINESS_NAME = "AI Support Agent";
 
 export const SUGGESTED_QUESTIONS = [
   "What time do you close on Sunday?",
