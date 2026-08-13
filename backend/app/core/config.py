@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     groq_max_tokens: int = 600
 
     # --- Business identity (used in the system prompt) ---
-    business_name: str = "Serenity Salon & Spa"
+    business_name: str = "AI Support Agent"
     business_description: str = "boutique hair, beauty, and wellness salon"
 
     model_config = SettingsConfigDict(

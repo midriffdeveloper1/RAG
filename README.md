@@ -1,4 +1,4 @@
-# AI Customer Support Agent (RAG) — Serenity Salon & Spa
+# AI Customer Support Agent (RAG) — AI Support Agent
 
 A scaffold for an AI-powered customer support chat agent, built for a fictional
 salon/spa business. Answers questions about services, pricing, hours, policies,
