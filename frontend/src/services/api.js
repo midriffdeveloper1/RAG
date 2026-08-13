@@ -1,9 +1,20 @@
 import axios from "axios";
+
+export const ADMIN_TOKEN_STORAGE_KEY = "ai_support_agent_admin_token";
+
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "/api/v1",
   headers: {
     "Content-Type": "application/json",
   },
+});
+
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY);
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 /**
@@ -16,6 +27,8 @@ export const apiClient = axios.create({
 export async function sendChatMessage(/* { question, sessionId } */) {
   throw new Error("sendChatMessage() is not implemented yet — wire this up to POST /chat.");
 }
+
+
 export async function checkHealth() {
   const { data } = await apiClient.get("/health");
   return data;

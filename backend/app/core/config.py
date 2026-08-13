@@ -13,11 +13,11 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
 
 
-    postgres_user: str = "support_agent"
-    postgres_password: str = "change_me"
+    postgres_user: str = "postgres"
+    postgres_password: str = "simransingh"
     postgres_host: str = "localhost"
     postgres_port: int = 5432
-    postgres_db: str = "support_agent_db"
+    postgres_db: str = "support_agent"
     database_url: str | None = None  # optional override
 
 
@@ -25,6 +25,31 @@ class Settings(BaseSettings):
     qdrant_port: int = 6333
     qdrant_collection_name: str = "business_knowledge_base"
     qdrant_api_key: str | None = None
+
+
+    secret_key: str = "dev-secret-key-change-me-in-production"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 8  # 8 hours
+ 
+
+    admin_email: str = "admin@serenitysalon.example"
+    admin_password: str = "change_me_now"
+    admin_seed_force_update: bool = False
+ 
+
+    upload_dir: str = "app/uploads"
+    max_upload_size_mb: int = 20
+    allowed_upload_extensions: str = ".pdf,.docx,.doc"
+ 
+    # --- Chunking ---
+    chunk_size: int = 800  # characters
+    chunk_overlap: int = 120  # characters
+ 
+    # --- Embeddings ---
+    # Local, no API key required. 384-dim, good balance of speed/quality.
+    embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    embedding_dimension: int = 384
+    embedding_batch_size: int = 32
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -37,6 +62,10 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> List[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
+    @property
+    def allowed_upload_extensions_list(self) -> List[str]:
+        return [ext.strip().lower() for ext in self.allowed_upload_extensions.split(",") if ext.strip()]
+    
     @property
     def sqlalchemy_database_url(self) -> str:
         """Build the Postgres connection string, unless DATABASE_URL is set explicitly."""
