@@ -1,3 +1,11 @@
+/**
+ * API client — STRUCTURE ONLY, NOT IMPLEMENTED.
+ *
+ * `apiClient` is ready to use (baseURL + headers configured). The actual
+ * request functions below are stubs — wire them up to your FastAPI routes
+ * once the /chat endpoint is implemented on the backend.
+ */
+
 import axios from "axios";
 
 export const ADMIN_TOKEN_STORAGE_KEY = "ai_support_agent_admin_token";
@@ -9,6 +17,8 @@ export const apiClient = axios.create({
   },
 });
 
+// Attach the admin JWT (if present) to every request. Public routes like
+// /health simply ignore the header, so this is safe to apply globally.
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY);
   if (token) {
@@ -19,16 +29,22 @@ apiClient.interceptors.request.use((config) => {
 
 /**
  * Send a user question to the backend RAG endpoint.
- * TODO: implement once POST /chat is live.
  *
  * @param {{ question: string, sessionId?: string }} params
  * @returns {Promise<{ answer: string, sources: Array, session_id: string }>}
  */
-export async function sendChatMessage(/* { question, sessionId } */) {
-  throw new Error("sendChatMessage() is not implemented yet — wire this up to POST /chat.");
+export async function sendChatMessage({ question, sessionId }) {
+  const { data } = await apiClient.post("/chat", {
+    question,
+    session_id: sessionId,
+  });
+  return data;
 }
 
-
+/**
+ * Check backend health. This one works out of the box against
+ * GET /api/v1/health.
+ */
 export async function checkHealth() {
   const { data } = await apiClient.get("/health");
   return data;
