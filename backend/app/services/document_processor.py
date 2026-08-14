@@ -1,5 +1,4 @@
-
-
+import difflib
 from pathlib import Path
 
 import docx  # python-docx
@@ -15,7 +14,7 @@ class UnsupportedFileTypeError(ValueError):
 
 
 def extract_text(file_path: str, file_type: str) -> str:
-   
+    """Extract raw text from a PDF or DOCX file on disk."""
     if file_type == "pdf":
         return _extract_pdf_text(file_path)
     if file_type == "docx":
@@ -26,7 +25,7 @@ def extract_text(file_path: str, file_type: str) -> str:
         #   (b) shell out to `libreoffice --headless --convert-to docx`
         #       before extraction.
         raise UnsupportedFileTypeError(
-            
+            "Legacy .doc files aren't supported yet — please upload .docx or .pdf."
         )
     raise UnsupportedFileTypeError(f"Unsupported file type: {file_type}")
 
@@ -56,13 +55,13 @@ def chunk_text(
     chunk_size: int | None = None,
     chunk_overlap: int | None = None,
 ) -> list[str]:
-    
     chunk_size = chunk_size or settings.chunk_size
     chunk_overlap = chunk_overlap or settings.chunk_overlap
 
     text = text.strip()
     if not text:
         return []
+    min_boundary_fraction = 0.5
 
     chunks: list[str] = []
     start = 0
@@ -71,10 +70,14 @@ def chunk_text(
     while start < text_length:
         end = min(start + chunk_size, text_length)
 
-        # Prefer breaking at the last paragraph/sentence boundary in range.
         if end < text_length:
-            boundary = max(text.rfind("\n\n", start, end), text.rfind(". ", start, end))
-            if boundary != -1 and boundary > start:
+            boundary = max(
+                text.rfind("\n\n", start, end),
+                text.rfind(". ", start, end),
+                text.rfind("\n", start, end),
+            )
+            min_boundary_pos = start + int(chunk_size * min_boundary_fraction)
+            if boundary != -1 and boundary >= min_boundary_pos:
                 end = boundary + 1
 
         chunk = text[start:end].strip()
@@ -83,9 +86,26 @@ def chunk_text(
 
         if end >= text_length:
             break
-        start = max(end - chunk_overlap, start + 1)  # always make forward progress
 
-    return chunks
+        # Guarantee real forward progress every iteration, regardless of
+        # where the boundary search landed — this is the actual fix for
+        # the near-duplicate cascade bug.
+        min_next_start = start + max(1, chunk_size - chunk_overlap)
+        start = max(end - chunk_overlap, min_next_start)
+
+    return _deduplicate_chunks(chunks)
+
+
+def _deduplicate_chunks(chunks: list[str], similarity_threshold: float = 0.9) -> list[str]:
+    deduped: list[str] = []
+    for chunk in chunks:
+        is_duplicate = any(
+            difflib.SequenceMatcher(None, chunk, prior).ratio() >= similarity_threshold
+            for prior in deduped[-3:]
+        )
+        if not is_duplicate:
+            deduped.append(chunk)
+    return deduped
 
 
 def infer_file_type(filename: str) -> str:
