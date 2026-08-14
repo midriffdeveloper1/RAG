@@ -30,13 +30,14 @@ apiClient.interceptors.request.use((config) => {
 /**
  * Send a user question to the backend RAG endpoint.
  *
- * @param {{ question: string, sessionId?: string }} params
+ * @param {{ question: string, sessionId?: string, history?: Array<{role: string, content: string}> }} params
  * @returns {Promise<{ answer: string, sources: Array, session_id: string }>}
  */
-export async function sendChatMessage({ question, sessionId }) {
+export async function sendChatMessage({ question, sessionId, history }) {
   const { data } = await apiClient.post("/chat", {
     question,
     session_id: sessionId,
+    history: history || [],
   });
   return data;
 }
