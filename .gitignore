@@ -16,6 +16,7 @@ env/
 .ruff_cache/
 *.sqlite3
 docs/
+uploads/
 # --- Alembic ---
 backend/alembic/versions/*.pyc
 
