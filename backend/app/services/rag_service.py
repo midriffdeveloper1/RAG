@@ -64,7 +64,6 @@ class RAGService:
     # Retrieval
 
     def retrieve_context(self, search_query: str, top_k: int | None = None) -> list[SourceChunk]:
-        """Hybrid vector+keyword search — see VectorStoreService.search."""
         hits = self.vector_store.search(search_query, top_k=top_k)
         return [
             SourceChunk(content=hit["text"], source=hit["source"], score=hit["score"])
@@ -77,6 +76,7 @@ class RAGService:
         if not context:
             return True
         best_score = max((chunk.score or 0.0) for chunk in context)
+        print("________________________", best_score)
         return best_score < settings.relevance_score_threshold
 
     def generate_answer(
@@ -102,16 +102,15 @@ class RAGService:
         history: list[ChatTurn] | None = None,
     ) -> ChatResponse:
         history = self._trim_history(history or [])
-
+        print("----------------------here---------------------")
         search_query = self._build_search_query(question, history)
         context = self.retrieve_context(search_query)
-
+        
         if self._is_out_of_domain(context):
             return ChatResponse(
                 answer=OUT_OF_DOMAIN_MESSAGE.format(business_name=settings.business_name),
                 sources=[],
                 session_id=session_id,
             )
-
         answer = self.generate_answer(question, context, history)
         return ChatResponse(answer=answer, sources=context, session_id=session_id)
