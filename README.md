@@ -10,6 +10,18 @@ and FAQs using Retrieval-Augmented Generation.
 ## Getting started
 
 ### 1. Infrastructure (Postgres + Qdrant)
+
+```bash
+Create Database and user, grant permission and configure the .env accordingly
+```
+
+
+```bash
+Install and configure Qdrant on Local System tehn run it 
+
+./qdrant.exe
+```
+
 ### 2. Backend
 ```bash
 cd backend
