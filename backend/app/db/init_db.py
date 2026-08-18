@@ -5,11 +5,9 @@ from app.core.database import Base, SessionLocal, engine
 from app.core.security import hash_password
 from app.models.admin import Admin
 
-# Import every model module here so Base.metadata knows about all tables
-# before create_all() runs.
-from app.models import admin as _admin_model  # noqa: F401
-from app.models import document as _document_model  # noqa: F401
-from app.models import knowledge_base as _kb_models  # noqa: F401
+from app.models import admin as _admin_model  
+from app.models import document as _document_model  
+from app.models import knowledge_base as _kb_models  
 
 logger = logging.getLogger(__name__)
 settings = get_settings()

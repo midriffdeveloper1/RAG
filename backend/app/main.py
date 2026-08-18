@@ -1,13 +1,4 @@
-"""
-FastAPI application entrypoint.
-
-Only the health route is wired up. Other routes (chat, knowledge base
-ingestion, etc.) are scaffolded under app/api/routes but intentionally
-left unregistered — see each file's docstring for what's pending.
-"""
-
 import logging
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -35,14 +26,10 @@ app.add_middleware(
 
 @app.on_event("startup")
 def on_startup():
-    """
-    Dev-only bootstrap: create tables + seed the admin account.
-    In production, run Alembic migrations instead of relying on this.
-    """
     init_db()
 
 
-# --- Routers ---
+# Routers
 app.include_router(health.router, prefix=settings.api_v1_prefix)
 app.include_router(auth.router, prefix=settings.api_v1_prefix)
 app.include_router(documents.router, prefix=settings.api_v1_prefix)

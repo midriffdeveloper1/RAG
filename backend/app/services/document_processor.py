@@ -1,7 +1,7 @@
 import difflib
 from pathlib import Path
 
-import docx  # python-docx
+import docx  
 from pypdf import PdfReader
 
 from app.core.config import get_settings
@@ -40,7 +40,6 @@ def _extract_docx_text(file_path: str) -> str:
     document = docx.Document(file_path)
     paragraphs = [p.text for p in document.paragraphs if p.text.strip()]
 
-    # Tables often hold pricing/hours in real documents — include them too.
     for table in document.tables:
         for row in table.rows:
             cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
@@ -87,9 +86,6 @@ def chunk_text(
         if end >= text_length:
             break
 
-        # Guarantee real forward progress every iteration, regardless of
-        # where the boundary search landed — this is the actual fix for
-        # the near-duplicate cascade bug.
         min_next_start = start + max(1, chunk_size - chunk_overlap)
         start = max(end - chunk_overlap, min_next_start)
 

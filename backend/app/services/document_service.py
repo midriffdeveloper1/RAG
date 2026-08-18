@@ -23,7 +23,7 @@ class DocumentService:
         self.upload_dir = Path(settings.upload_dir)
         self.upload_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- Upload -------------------------------------------------------------
+    # Upload
 
     def save_upload(self, file: UploadFile) -> tuple[Path, str, int]:
         file_type = infer_file_type(file.filename)
@@ -69,10 +69,7 @@ class DocumentService:
         return document
 
     def find_completed_duplicate(self, content_hash: str) -> Document | None:
-        """
-        Re-upload detection: if the exact same file content was already
-        processed successfully, skip redundant re-embedding.
-        """
+
         return (
             self.db.query(Document)
             .filter(
@@ -84,7 +81,7 @@ class DocumentService:
 
 
     def process_document(self, document: Document) -> Document:
-        """Run extraction -> chunking -> embedding -> upsert for one document."""
+       
         document.status = DocumentStatus.PROCESSING
         self.db.commit()
 
@@ -118,7 +115,7 @@ class DocumentService:
         self.db.refresh(document)
         return document
 
-    # --- Reindex / delete (memory management) 
+    #  Reindex / delete (memory management) 
 
     def reindex_document(self, document: Document) -> Document:
         self.vector_store.delete_by_document_id(document.id)

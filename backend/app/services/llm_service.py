@@ -35,5 +35,4 @@ class LLMService:
 
 @lru_cache
 def get_llm_service() -> LLMService:
-    """Cached singleton. Raises RuntimeError (uncached) if GROQ_API_KEY is missing."""
     return LLMService()

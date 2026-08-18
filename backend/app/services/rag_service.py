@@ -37,7 +37,7 @@ class RAGService:
     def __init__(self, vector_store: VectorStoreService | None = None) -> None:
         self.vector_store = vector_store or get_vector_store()
 
-    # History handling
+    # History 
 
     def _trim_history(self, history: list[ChatTurn]) -> list[ChatTurn]:
         """Keep only the last N exchanges (user+assistant pairs), server-side."""
