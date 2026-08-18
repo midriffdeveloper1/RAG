@@ -1,13 +1,6 @@
-"""Pydantic schemas for the chat/RAG endpoint."""
-
 from typing import List, Literal, Optional
-
 from pydantic import BaseModel, Field
-
-
 class ChatTurn(BaseModel):
-    """One message in the conversation so far, used for follow-up context."""
-
     role: Literal["user", "assistant"]
     content: str
 

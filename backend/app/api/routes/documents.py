@@ -1,8 +1,5 @@
-
-
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
-
 from app.api.deps import get_current_admin
 from app.core.database import get_db
 from app.models.admin import Admin

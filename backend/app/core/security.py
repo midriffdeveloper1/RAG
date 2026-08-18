@@ -20,7 +20,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
  
  
 def create_access_token(subject: str, extra_claims: dict[str, Any] | None = None) -> str:
-    """Create a signed JWT. `subject` is typically the admin's email."""
+  
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
     payload: dict[str, Any] = {"sub": subject, "exp": expire}
     if extra_claims:
@@ -29,7 +29,7 @@ def create_access_token(subject: str, extra_claims: dict[str, Any] | None = None
  
  
 def decode_access_token(token: str) -> dict[str, Any]:
-    """Decode and validate a JWT. Raises jose.JWTError if invalid/expired."""
+ 
     try:
         return jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
     except JWTError as exc:

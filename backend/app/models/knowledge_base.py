@@ -38,9 +38,9 @@ class OpeningHour(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     business_id: Mapped[int] = mapped_column(ForeignKey("business.id"))
-    day_of_week: Mapped[str] = mapped_column(String(20), nullable=False)  # e.g. "Sunday"
-    open_time: Mapped[str] = mapped_column(String(20), nullable=True)  # "09:00"
-    close_time: Mapped[str] = mapped_column(String(20), nullable=True)  # "18:00"
+    day_of_week: Mapped[str] = mapped_column(String(20), nullable=False) 
+    open_time: Mapped[str] = mapped_column(String(20), nullable=True)  
+    close_time: Mapped[str] = mapped_column(String(20), nullable=True)  
     is_closed: Mapped[bool] = mapped_column(default=False)
 
     business: Mapped["Business"] = relationship(back_populates="opening_hours")
@@ -55,7 +55,7 @@ class FAQ(Base):
     answer: Mapped[str] = mapped_column(Text, nullable=False)
     category: Mapped[str] = mapped_column(
         String(100), nullable=True
-    )  # e.g. "policy", "pricing", "booking"
+    ) 
 
     business: Mapped["Business"] = relationship(back_populates="faqs")
 
@@ -65,5 +65,5 @@ class Policy(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     business_id: Mapped[int] = mapped_column(ForeignKey("business.id"))
-    title: Mapped[str] = mapped_column(String(255), nullable=False)  # e.g. "Cancellation Policy"
+    title: Mapped[str] = mapped_column(String(255), nullable=False)  
     content: Mapped[str] = mapped_column(Text, nullable=False)

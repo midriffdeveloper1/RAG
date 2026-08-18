@@ -60,7 +60,7 @@ class VectorStoreService:
                 distance=qmodels.Distance.COSINE,
             ),
         )
-        # Index document_id so filtered delete (reindex/delete) is fast.
+        
         self.client.create_payload_index(
             collection_name=self.collection_name,
             field_name="document_id",

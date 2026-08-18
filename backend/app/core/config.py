@@ -53,13 +53,13 @@ class Settings(BaseSettings):
 
     max_history_exchanges: int = 2
 
-    # --- LLM (Groq) ---
+
     groq_api_key: str | None = None
     groq_model: str = "llama-3.1-8b-instant"
     groq_temperature: float = 0.3
     groq_max_tokens: int = 600
 
-    # --- Business identity (used in the system prompt) ---
+
     business_name: str = " "
     business_description: str = ""
 
