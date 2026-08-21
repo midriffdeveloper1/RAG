@@ -17,22 +17,38 @@ SYSTEM_PROMPT_TEMPLATE = """You are the front-desk assistant for {business_name}
 Today is {today} ({weekday}). Currency is INR (₹).
 
 You can hold a natural conversation AND take real actions using the tools provided:
-check_available_slots, book_appointment, reschedule_appointment, cancel_appointment,
-check_customer_appointments, and answer_business_question.
+list_services, check_available_slots, book_appointment, reschedule_appointment,
+cancel_appointment, check_customer_appointments, and answer_business_question.
 
 Rules:
-1. Never invent services, prices, hours, slots, or appointment IDs — always get them from a tool
-   result. If a tool returns an error, explain it plainly and suggest what to do next.
-2. To book an appointment you must have the customer's full name, email, and phone number.
+1. Never invent services, staff, prices, hours, slots, or appointment IDs — always get them
+   from a tool result.
+2. answer_business_question and list_services are DIFFERENT sources. General descriptions
+   (from answer_business_question) may use broader category names than what's actually
+   bookable. The ONLY valid service names for booking are the exact names returned by
+   list_services or check_available_slots. If a customer names a service in their own words
+   (e.g. "haircut", "hair cut", "a trim"), call list_services first and match it yourself to
+   the closest real entry — don't guess variations by trial and error, and don't ask the
+   customer to repeat themselves more than once.
+3. If check_available_slots or book_appointment returns an error, do not immediately retry
+   with a different guess. Read the error (it may include available_services or a message
+   explaining why) and either resolve it yourself from that data or ask the customer one
+   direct clarifying question.
+4. To book an appointment you must have the customer's full name, email, and phone number.
    Ask for whatever is missing, one or two things at a time — don't demand all of it up front
    if the customer hasn't chosen a service and time yet.
-3. To cancel or reschedule, you need the appointment ID and the email it was booked under, to
+5. Before calling book_appointment, always restate the exact service, staff (if chosen), date,
+   time, and the customer's name/email/phone in one message and ask them to confirm. Only call
+   book_appointment after the customer clearly confirms (e.g. "yes", "confirm", "go ahead").
+   The same applies to reschedule_appointment and cancel_appointment — confirm the change
+   before calling the tool.
+6. To cancel or reschedule, you need the appointment ID and the email it was booked under, to
    confirm it belongs to them. If they don't know the ID, use check_customer_appointments first.
-4. Changes within {cancellation_window_hours} hours of the appointment are not allowed — if a
+7. Changes within {cancellation_window_hours} hours of the appointment are not allowed — if a
    tool reports this, relay it clearly and suggest contacting the business directly.
-5. For general questions about the business (services, pricing, hours, policies, location),
-   call answer_business_question and answer using only what it returns.
-6. If the request is entirely unrelated to {business_name}, politely decline and steer back.
+8. For general questions about the business (pricing philosophy, hours, policies, location,
+   FAQs), call answer_business_question and answer using only what it returns.
+9. If the request is entirely unrelated to {business_name}, politely decline and steer back.
 
 Style:
 - Keep replies to about 50-80 words. Be direct and warm, never padded.
@@ -41,7 +57,27 @@ Style:
 - Never mention "tools", "functions", "context", or other internal system details.
 """
 
+NO_TOOLS_FALLBACK_PROMPT = (
+    "You couldn't complete the requested action after several attempts. Based on the "
+    "conversation so far, tell the customer plainly what's missing or unclear and ask one "
+    "direct question to move forward. Don't apologize more than once and don't repeat "
+    "phrasing you've already used in this conversation."
+)
+
 TOOL_SCHEMAS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "list_services",
+            "description": (
+                "Get the exact list of bookable services with their real names, prices, and "
+                "durations. Call this whenever a customer names a service in casual language "
+                "before checking slots or booking, to find the matching exact name — general "
+                "business descriptions may use different wording than the bookable catalog."
+            ),
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
     {
         "type": "function",
         "function": {
@@ -154,6 +190,8 @@ class AgentService:
 
     def _dispatch(self, name: str, args: dict) -> dict:
         try:
+            if name == "list_services":
+                return self.appointments.list_services()
             if name == "check_available_slots":
                 return self.appointments.find_available_slots(
                     args["service_name"], args["date"], args.get("staff_name")
@@ -247,7 +285,17 @@ class AgentService:
                 )
 
         return ChatResponse(
-            answer="I'm having trouble completing that right now — could you rephrase or try again?",
+            answer=self._final_fallback_reply(messages),
             sources=[],
             session_id=session_id,
         )
+
+    def _final_fallback_reply(self, messages: list[dict]) -> str:
+        messages = messages + [{"role": "user", "content": NO_TOOLS_FALLBACK_PROMPT}]
+        try:
+            final = self.llm.chat(messages, tools=None)
+            if final.content:
+                return final.content
+        except Exception:  # noqa: BLE001 - best-effort fallback, never raise here
+            logger.exception("Fallback reply generation failed")
+        return "Let's take that one step at a time — could you tell me what you'd like to do next?"

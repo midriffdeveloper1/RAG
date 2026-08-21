@@ -1,3 +1,5 @@
+import difflib
+import re
 from datetime import date as date_type
 from datetime import datetime, timedelta
 
@@ -35,6 +37,24 @@ def to_appointment_out(appointment: Appointment) -> AppointmentOut:
     )
 
 
+_FILLER_WORDS = {"service", "services", "please", "appointment", "for", "the", "a", "an"}
+
+
+def _tokens(text: str) -> list[str]:
+    words = re.findall(r"[a-z0-9]+", text.lower())
+    stemmed = [w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w for w in words]
+    return [w for w in stemmed if len(w) >= 3 and w not in _FILLER_WORDS]
+
+
+def _tokens_overlap(a: str, b: str) -> bool:
+    if a == b:
+        return True
+    if len(a) < 4 or len(b) < 4:
+        return False  # short tokens (e.g. "men") only match by exact equality,
+        # otherwise "men" would wrongly match inside "women"
+    return a in b or b in a
+
+
 class AppointmentPolicyError(ValueError):
     """Raised when a customer-facing action breaks a booking rule."""
 
@@ -45,11 +65,69 @@ class AppointmentService:
 
     # Lookups
 
+    @staticmethod
+    def _resolve_by_name(query: str, options: dict[str, object]) -> object | None:
+        """Matches `query` against `options` (lowercase-name -> object) by
+        exact match, substring containment, word-overlap, then character
+        similarity — so casual/reordered phrasing like "men's hair cut"
+        still resolves to "Haircut - Men"."""
+        cleaned = query.strip().lower()
+        if not cleaned or not options:
+            return None
+        if cleaned in options:
+            return options[cleaned]
+
+        contains = [name for name in options if cleaned in name or name in cleaned]
+        if len(contains) == 1:
+            return options[contains[0]]
+
+        query_tokens = _tokens(query)
+        if query_tokens:
+            scores: dict[str, float] = {}
+            for name in options:
+                name_tokens = _tokens(name)
+                if not name_tokens:
+                    continue
+                matched = sum(
+                    1 for qt in query_tokens if any(_tokens_overlap(qt, nt) for nt in name_tokens)
+                )
+                scores[name] = matched / len(query_tokens)
+            if scores:
+                best_score = max(scores.values())
+                if best_score >= 0.6:
+                    top = [name for name, score in scores.items() if score == best_score]
+                    if len(top) == 1:
+                        return options[top[0]]
+                    return None  # ambiguous (e.g. "hair cut" alone matches both men's and
+                    # women's cuts) — let the caller ask the customer to clarify instead
+                    # of silently guessing
+
+        close = difflib.get_close_matches(cleaned, options.keys(), n=1, cutoff=0.6)
+        if close:
+            return options[close[0]]
+        return None
+
     def _get_service(self, name: str) -> Service | None:
-        return self.db.query(Service).filter(func.lower(Service.name) == name.strip().lower()).first()
+        services = self.db.query(Service).all()
+        return self._resolve_by_name(name, {s.name.lower(): s for s in services})
 
     def _get_staff(self, name: str) -> Staff | None:
-        return self.db.query(Staff).filter(func.lower(Staff.name) == name.strip().lower()).first()
+        staff = self.db.query(Staff).filter(Staff.is_active.is_(True)).all()
+        return self._resolve_by_name(name, {s.name.lower(): s for s in staff})
+
+    def list_services(self) -> dict:
+        services = self.db.query(Service).order_by(Service.name).all()
+        return {
+            "services": [
+                {
+                    "name": s.name,
+                    "description": s.description,
+                    "price": s.price,
+                    "duration_minutes": s.duration_minutes,
+                }
+                for s in services
+            ]
+        }
 
     def get(self, appointment_id: int) -> Appointment | None:
         return self.db.query(Appointment).filter(Appointment.id == appointment_id).first()
@@ -73,7 +151,10 @@ class AppointmentService:
     ) -> dict:
         service = self._get_service(service_name)
         if service is None:
-            return {"error": f"We don't have a service called '{service_name}'."}
+            return {
+                "error": f"We don't have a service called '{service_name}'.",
+                "available_services": [s.name for s in self.db.query(Service).order_by(Service.name).all()],
+            }
 
         try:
             target_date = parse_date(date_str)
@@ -178,7 +259,10 @@ class AppointmentService:
 
         service = self._get_service(service_name)
         if service is None:
-            return {"error": f"We don't have a service called '{service_name}'."}
+            return {
+                "error": f"We don't have a service called '{service_name}'.",
+                "available_services": [s.name for s in self.db.query(Service).order_by(Service.name).all()],
+            }
 
         try:
             target_date = parse_date(date_str)
