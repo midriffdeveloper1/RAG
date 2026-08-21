@@ -3,6 +3,8 @@ const STATUS_LABELS = {
   processing: "Processing",
   completed: "Completed",
   failed: "Failed",
+  booked: "Booked",
+  cancelled: "Cancelled",
 };
 
 export default function StatusBadge({ status }) {
