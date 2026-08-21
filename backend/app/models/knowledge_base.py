@@ -31,6 +31,9 @@ class Service(Base):
     duration_minutes: Mapped[int] = mapped_column(nullable=True)
 
     business: Mapped["Business"] = relationship(back_populates="services")
+    staff: Mapped[list["Staff"]] = relationship(
+        secondary="staff_services", back_populates="services"
+    )
 
 
 class OpeningHour(Base):
