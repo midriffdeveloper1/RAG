@@ -1,9 +1,8 @@
 /**
- * API client — STRUCTURE ONLY, NOT IMPLEMENTED.
+ * API client — public/customer-facing endpoints.
  *
- * `apiClient` is ready to use (baseURL + headers configured). The actual
- * request functions below are stubs — wire them up to your FastAPI routes
- * once the /chat endpoint is implemented on the backend.
+ * `apiClient` carries the baseURL, JSON header, and admin JWT (when
+ * present). The functions below are fully wired to the backend.
  */
 
 import axios from "axios";

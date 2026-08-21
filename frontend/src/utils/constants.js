@@ -13,4 +13,6 @@ export const MESSAGE_ROLE = {
   ASSISTANT: "assistant",
 };
 
-export const MAX_HISTORY_MESSAGES = 2;
+// Sent as `history` on every /chat request — kept in sync with the
+// backend's MAX_HISTORY_EXCHANGES (3 exchanges = 6 messages).
+export const MAX_HISTORY_MESSAGES = 6;
