@@ -1,15 +1,17 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
+from app.core.database import get_db
 from app.schemas.chat import ChatRequest, ChatResponse
-from app.services.rag_service import RAGService
+from app.services.agent_service import AgentService
 
 router = APIRouter(tags=["Chat"])
 
 
 @router.post("/chat", response_model=ChatResponse)
-def chat_endpoint(payload: ChatRequest):
-    rag_service = RAGService()
+def chat_endpoint(payload: ChatRequest, db: Session = Depends(get_db)):
+    agent = AgentService(db)
     try:
-        return rag_service.answer_question(payload.question, payload.session_id)
-    except NotImplementedError as exc:
-        raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=str(exc))
+        return agent.answer(payload.question, payload.session_id, payload.history)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))

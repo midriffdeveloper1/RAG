@@ -5,9 +5,7 @@ from app.core.database import Base, SessionLocal, engine
 from app.core.security import hash_password
 from app.models.admin import Admin
 
-from app.models import admin as _admin_model  
-from app.models import document as _document_model  
-from app.models import knowledge_base as _kb_models  
+from app import models as _models  # noqa: F401  (registers all mappers)
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -43,3 +41,7 @@ def seed_admin() -> None:
 def init_db() -> None:
     create_tables()
     seed_admin()
+
+    from app.db.seed_business import seed_business_catalog
+
+    seed_business_catalog()

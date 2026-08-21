@@ -51,13 +51,18 @@ class Settings(BaseSettings):
     keyword_boost_weight: float = 0.3
     relevance_score_threshold: float = 0.1
 
-    max_history_exchanges: int = 2
+    max_history_exchanges: int = 3
+
+    cancellation_window_hours: int = 24
+    slot_step_minutes: int = 30
+    booking_window_days: int = 30
+    max_tool_iterations: int = 4
 
 
     groq_api_key: str | None = None
     groq_model: str = "llama-3.1-8b-instant"
     groq_temperature: float = 0.3
-    groq_max_tokens: int = 600
+    groq_max_tokens: int = 300
 
 
     business_name: str = " "

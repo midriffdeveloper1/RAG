@@ -2,7 +2,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, chat, documents, health
+from app.api.routes import appointments, auth, chat, documents, health, services, staff
 from app.core.config import get_settings
 from app.db.init_db import init_db
 
@@ -33,6 +33,9 @@ def on_startup():
 app.include_router(health.router, prefix=settings.api_v1_prefix)
 app.include_router(auth.router, prefix=settings.api_v1_prefix)
 app.include_router(documents.router, prefix=settings.api_v1_prefix)
+app.include_router(services.router, prefix=settings.api_v1_prefix)
+app.include_router(staff.router, prefix=settings.api_v1_prefix)
+app.include_router(appointments.router, prefix=settings.api_v1_prefix)
 app.include_router(chat.router, prefix=settings.api_v1_prefix)
 
 

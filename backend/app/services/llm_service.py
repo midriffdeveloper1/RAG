@@ -1,4 +1,3 @@
-
 import logging
 from functools import lru_cache
 
@@ -31,6 +30,20 @@ class LLMService:
             ],
         )
         return response.choices[0].message.content
+
+    def chat(self, messages: list[dict], tools: list[dict] | None = None):
+        kwargs: dict = {
+            "model": self.model,
+            "temperature": settings.groq_temperature,
+            "max_tokens": settings.groq_max_tokens,
+            "messages": messages,
+        }
+        if tools:
+            kwargs["tools"] = tools
+            kwargs["tool_choice"] = "auto"
+
+        response = self.client.chat.completions.create(**kwargs)
+        return response.choices[0].message
 
 
 @lru_cache
