@@ -21,8 +21,6 @@ class ChatRequest(BaseModel):
 
 
 class SourceChunk(BaseModel):
-    """A retrieved knowledge-base chunk that backed the answer (for citations/debugging)."""
-
     content: str
     source: Optional[str] = None
     score: Optional[float] = None

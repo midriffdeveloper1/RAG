@@ -1,8 +1,3 @@
-"""
-Admin auth — login only. There is no signup route on purpose; the single
-admin account is seeded from env vars (see app/db/init_db.py).
-"""
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 

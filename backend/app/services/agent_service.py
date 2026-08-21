@@ -281,7 +281,11 @@ class AgentService:
                     args = {}
                 result = self._dispatch(call.function.name, args)
                 messages.append(
-                    {"role": "tool", "tool_call_id": call.id, "content": json.dumps(result)}
+                    {
+                        "role": "tool",
+                        "tool_call_id": call.id,
+                        "content": json.dumps(result, default=str),
+                    }
                 )
 
         return ChatResponse(
@@ -296,6 +300,6 @@ class AgentService:
             final = self.llm.chat(messages, tools=None)
             if final.content:
                 return final.content
-        except Exception:  # noqa: BLE001 - best-effort fallback, never raise here
+        except Exception:  
             logger.exception("Fallback reply generation failed")
         return "Let's take that one step at a time — could you tell me what you'd like to do next?"

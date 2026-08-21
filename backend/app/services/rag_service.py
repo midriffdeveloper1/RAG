@@ -40,7 +40,6 @@ class RAGService:
     # History 
 
     def _trim_history(self, history: list[ChatTurn]) -> list[ChatTurn]:
-        """Keep only the last N exchanges (user+assistant pairs), server-side."""
         max_messages = settings.max_history_exchanges * 2
         return history[-max_messages:] if history else []
 
@@ -76,7 +75,6 @@ class RAGService:
         if not context:
             return True
         best_score = max((chunk.score or 0.0) for chunk in context)
-        print("________________________", best_score)
         return best_score < settings.relevance_score_threshold
 
     def generate_answer(
@@ -102,7 +100,6 @@ class RAGService:
         history: list[ChatTurn] | None = None,
     ) -> ChatResponse:
         history = self._trim_history(history or [])
-        print("----------------------here---------------------")
         search_query = self._build_search_query(question, history)
         context = self.retrieve_context(search_query)
         

@@ -50,8 +50,7 @@ def _tokens_overlap(a: str, b: str) -> bool:
     if a == b:
         return True
     if len(a) < 4 or len(b) < 4:
-        return False  # short tokens (e.g. "men") only match by exact equality,
-        # otherwise "men" would wrongly match inside "women"
+        return False  
     return a in b or b in a
 
 
@@ -67,10 +66,6 @@ class AppointmentService:
 
     @staticmethod
     def _resolve_by_name(query: str, options: dict[str, object]) -> object | None:
-        """Matches `query` against `options` (lowercase-name -> object) by
-        exact match, substring containment, word-overlap, then character
-        similarity — so casual/reordered phrasing like "men's hair cut"
-        still resolves to "Haircut - Men"."""
         cleaned = query.strip().lower()
         if not cleaned or not options:
             return None
@@ -98,10 +93,7 @@ class AppointmentService:
                     top = [name for name, score in scores.items() if score == best_score]
                     if len(top) == 1:
                         return options[top[0]]
-                    return None  # ambiguous (e.g. "hair cut" alone matches both men's and
-                    # women's cuts) — let the caller ask the customer to clarify instead
-                    # of silently guessing
-
+                    return None 
         close = difflib.get_close_matches(cleaned, options.keys(), n=1, cutoff=0.6)
         if close:
             return options[close[0]]

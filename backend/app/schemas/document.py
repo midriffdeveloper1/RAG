@@ -23,8 +23,6 @@ class DocumentListResponse(BaseModel):
 
 
 class DocumentActionResponse(BaseModel):
-    """Generic response for reindex/delete actions."""
-
     id: int
     status: DocumentStatus
     message: str

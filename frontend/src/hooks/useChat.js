@@ -4,13 +4,6 @@ import { MAX_HISTORY_MESSAGES, MESSAGE_ROLE } from "../utils/constants.js";
 
 const WELCOME_MESSAGE_ID = "welcome";
 
-/**
- * Encapsulates chat state (messages, loading, error) for the widget.
- * Wired to POST /chat (hybrid retrieval + Groq generation) and now also
- * sends the last few exchanges as `history`, so follow-up questions like
- * "how much is that?" are understood in context. The backend trims/uses
- * this the same way regardless — this is just supplying it.
- */
 export function useChat() {
   const [messages, setMessages] = useState([
     {
@@ -22,9 +15,6 @@ export function useChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // One session id per widget mount — threaded through to the backend for
-  // future use (e.g. server-side history storage), not required today
-  // since the client sends its own history each request.
   const sessionIdRef = useRef(crypto.randomUUID());
 
   const sendMessage = useCallback(
@@ -33,8 +23,7 @@ export function useChat() {
 
       const userMessage = { id: crypto.randomUUID(), role: MESSAGE_ROLE.USER, content: text };
 
-      // History is everything so far, excluding the static welcome
-      // message, trimmed to the last few exchanges.
+     
       const history = messages
         .filter((m) => m.id !== WELCOME_MESSAGE_ID)
         .slice(-MAX_HISTORY_MESSAGES)
