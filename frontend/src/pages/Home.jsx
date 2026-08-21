@@ -1,5 +1,4 @@
 import ChatWidget from "../components/Chat/ChatWidget.jsx";
-import { BUSINESS_NAME } from "../utils/constants.js";
 
 export default function Home() {
   return (
