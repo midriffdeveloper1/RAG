@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getBrowserId } from "../utils/browserId.js";
 
 export const ADMIN_TOKEN_STORAGE_KEY = "ai_support_agent_admin_token";
 
@@ -17,14 +18,33 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-
-export async function sendChatMessage({ question, sessionId, history }) {
+export async function sendChatMessage({ question, sessionId }) {
   const { data } = await apiClient.post("/chat", {
     question,
-    session_id: sessionId,
-    history: history || [],
+    browser_id: getBrowserId(),
+    session_id: sessionId || null,
   });
   return data;
+}
+
+export async function listChatSessions() {
+  const { data } = await apiClient.get("/chat/sessions", {
+    params: { browser_id: getBrowserId() },
+  });
+  return data.sessions;
+}
+
+export async function getChatSession(sessionId) {
+  const { data } = await apiClient.get(`/chat/sessions/${sessionId}`, {
+    params: { browser_id: getBrowserId() },
+  });
+  return data;
+}
+
+export async function deleteChatSession(sessionId) {
+  await apiClient.delete(`/chat/sessions/${sessionId}`, {
+    params: { browser_id: getBrowserId() },
+  });
 }
 
 export async function checkHealth() {

@@ -1,8 +1,8 @@
 import { Route, Routes } from "react-router-dom";
-import ProtectedRoute from "./components/admin/ProtectedRoute.jsx";
+import ProtectedRoute from "./components/Admin/ProtectedRoute.jsx";
 import Footer from "./components/layout/Footer.jsx";
 import Header from "./components/layout/Header.jsx";
-import AdminDashboard from "./pages/AdminDashboard.jsx";
+import AdminDashboard from "./pages/Admindashboard.jsx";
 import AdminLogin from "./pages/AdminLogin.jsx";
 import Home from "./pages/Home.jsx";
 

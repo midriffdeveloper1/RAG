@@ -18,34 +18,45 @@ Today is {today} ({weekday}). Currency is INR (₹).
 
 You can hold a natural conversation AND take real actions using the tools provided:
 list_services, check_available_slots, book_appointment, reschedule_appointment,
-cancel_appointment, check_customer_appointments, and answer_business_question.
+cancel_appointment, check_customer_appointments, update_appointment_contact, and
+answer_business_question.
 
 Rules:
-1. Never invent services, staff, prices, hours, slots, or appointment IDs — always get them
-   from a tool result.
-2. answer_business_question and list_services are DIFFERENT sources. General descriptions
+1. Never invent services, staff, prices, hours, slots, appointment IDs, addresses, or ANY
+   customer detail (name, email, phone) — always get them from a tool result or from what the
+   customer themselves typed in this conversation. If you don't have a piece of information
+   from either of those two sources, say so plainly instead of filling the gap with a
+   plausible-sounding guess. This applies even to routine-looking details like a location line
+   in a booking confirmation — omit it, or fetch it via answer_business_question, never invent it.
+2. When confirming a booking or reporting appointment details back to a customer, quote the
+   name/email/phone exactly as returned by the tool (book_appointment, check_customer_appointments,
+   etc.) in that same turn — never reuse or restate values from earlier in the conversation from
+   memory, and never substitute a different-looking but similar value.
+3. answer_business_question and list_services are DIFFERENT sources. General descriptions
    (from answer_business_question) may use broader category names than what's actually
    bookable. The ONLY valid service names for booking are the exact names returned by
    list_services or check_available_slots. If a customer names a service in their own words
    (e.g. "haircut", "hair cut", "a trim"), call list_services first and match it yourself to
    the closest real entry — don't guess variations by trial and error, and don't ask the
    customer to repeat themselves more than once.
-3. If check_available_slots or book_appointment returns an error, do not immediately retry
+4. If check_available_slots or book_appointment returns an error, do not immediately retry
    with a different guess. Read the error (it may include available_services or a message
    explaining why) and either resolve it yourself from that data or ask the customer one
    direct clarifying question.
-4. To book an appointment you must have the customer's full name, email, and phone number.
+5. To book an appointment you must have the customer's full name, email, and phone number.
    Ask for whatever is missing, one or two things at a time — don't demand all of it up front
    if the customer hasn't chosen a service and time yet.
-5. Before calling book_appointment, always restate the exact service, staff (if chosen), date,
+6. Before calling book_appointment, always restate the exact service, staff (if chosen), date,
    time, and the customer's name/email/phone in one message and ask them to confirm. Only call
    book_appointment after the customer clearly confirms (e.g. "yes", "confirm", "go ahead").
-   The same applies to reschedule_appointment and cancel_appointment — confirm the change
-   before calling the tool.
-6. To cancel or reschedule, you need the appointment ID and the email it was booked under, to
+   The same applies to reschedule_appointment, cancel_appointment, and
+   update_appointment_contact — confirm the change before calling the tool.
+7. To cancel, reschedule, check details, or correct contact info, you need the appointment ID
+   and the email it was booked under, to
    confirm it belongs to them. If they don't know the ID, use check_customer_appointments first.
 7. Changes within {cancellation_window_hours} hours of the appointment are not allowed — if a
-   tool reports this, relay it clearly and suggest contacting the business directly.
+   tool reports this, relay it clearly and suggest contacting the business directly. This does
+   not apply to update_appointment_contact (correcting a typo isn't a schedule change).
 8. For general questions about the business (pricing philosophy, hours, policies, location,
    FAQs), call answer_business_question and answer using only what it returns.
 9. If the request is entirely unrelated to {business_name}, politely decline and steer back.
@@ -154,11 +165,37 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "check_customer_appointments",
-            "description": "List a customer's appointments by their email address.",
+            "description": (
+                "List a customer's appointments by their email address, including the exact "
+                "name/email/phone on file for each. Use this whenever a customer asks about "
+                "their own booking details — never guess or restate contact info from memory."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {"customer_email": {"type": "string"}},
                 "required": ["customer_email"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_appointment_contact",
+            "description": (
+                "Correct the name, email, or phone number on an existing booked appointment. "
+                "Requires the appointment ID and the email it's currently booked under, to "
+                "verify ownership — same as cancel/reschedule."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "appointment_id": {"type": "integer"},
+                    "customer_email": {"type": "string", "description": "The current email on the booking"},
+                    "new_name": {"type": "string"},
+                    "new_email": {"type": "string"},
+                    "new_phone": {"type": "string"},
+                },
+                "required": ["appointment_id", "customer_email"],
             },
         },
     },
@@ -221,6 +258,14 @@ class AgentService:
                 )
             if name == "check_customer_appointments":
                 return self.appointments.list_for_customer(args["customer_email"])
+            if name == "update_appointment_contact":
+                return self.appointments.update_contact(
+                    appointment_id=int(args["appointment_id"]),
+                    customer_email=args["customer_email"],
+                    new_name=args.get("new_name"),
+                    new_email=args.get("new_email"),
+                    new_phone=args.get("new_phone"),
+                )
             if name == "answer_business_question":
                 hits = self.vector_store.search(args["question"])
                 if not hits:
@@ -300,6 +345,6 @@ class AgentService:
             final = self.llm.chat(messages, tools=None)
             if final.content:
                 return final.content
-        except Exception:  
+        except Exception:  # noqa: BLE001 - best-effort fallback, never raise here
             logger.exception("Fallback reply generation failed")
         return "Let's take that one step at a time — could you tell me what you'd like to do next?"

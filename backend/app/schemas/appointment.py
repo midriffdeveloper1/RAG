@@ -43,3 +43,6 @@ class AdminAppointmentUpdate(BaseModel):
     status: AppointmentStatus | None = None
     notes: str | None = None
     cancellation_reason: str | None = None
+    customer_name: str | None = None
+    customer_email: str | None = None
+    customer_phone: str | None = None

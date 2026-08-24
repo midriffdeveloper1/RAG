@@ -66,6 +66,7 @@ class AppointmentService:
 
     @staticmethod
     def _resolve_by_name(query: str, options: dict[str, object]) -> object | None:
+        
         cleaned = query.strip().lower()
         if not cleaned or not options:
             return None
@@ -93,7 +94,8 @@ class AppointmentService:
                     top = [name for name, score in scores.items() if score == best_score]
                     if len(top) == 1:
                         return options[top[0]]
-                    return None 
+                    return None  
+
         close = difflib.get_close_matches(cleaned, options.keys(), n=1, cutoff=0.6)
         if close:
             return options[close[0]]
@@ -344,6 +346,42 @@ class AppointmentService:
         self.db.commit()
         return {"appointment_id": appointment.id, "status": "cancelled"}
 
+    def update_contact(
+        self,
+        appointment_id: int,
+        customer_email: str,
+        new_name: str | None = None,
+        new_email: str | None = None,
+        new_phone: str | None = None,
+    ) -> dict:
+        result = self._verify_owned_booking(appointment_id, customer_email)
+        if isinstance(result, dict):
+            return result
+        appointment = result
+
+        if new_email is not None and not is_valid_email(new_email):
+            return {"error": "That email address doesn't look valid."}
+        if new_phone is not None and not is_valid_phone(new_phone):
+            return {"error": "That phone number doesn't look valid."}
+        if not any([new_name, new_email, new_phone]):
+            return {"error": "Nothing to update — provide a new name, email, or phone."}
+
+        if new_name:
+            appointment.customer_name = new_name.strip()
+        if new_email:
+            appointment.customer_email = new_email.strip().lower()
+        if new_phone:
+            appointment.customer_phone = new_phone.strip()
+
+        self.db.commit()
+        return {
+            "appointment_id": appointment.id,
+            "customer_name": appointment.customer_name,
+            "customer_email": appointment.customer_email,
+            "customer_phone": appointment.customer_phone,
+            "status": "updated",
+        }
+
     def reschedule(
         self,
         appointment_id: int,
@@ -402,7 +440,11 @@ class AppointmentService:
                     "staff": a.staff.name,
                     "date": str(a.appointment_date),
                     "start_time": a.start_time.strftime("%H:%M"),
+                    "end_time": a.end_time.strftime("%H:%M"),
                     "status": a.status.value,
+                    "customer_name": a.customer_name,
+                    "customer_email": a.customer_email,
+                    "customer_phone": a.customer_phone,
                 }
                 for a in appointments
             ]
@@ -452,6 +494,12 @@ class AppointmentService:
             appointment.notes = payload.notes
         if payload.cancellation_reason is not None:
             appointment.cancellation_reason = payload.cancellation_reason
+        if payload.customer_name is not None:
+            appointment.customer_name = payload.customer_name
+        if payload.customer_email is not None:
+            appointment.customer_email = payload.customer_email.strip().lower()
+        if payload.customer_phone is not None:
+            appointment.customer_phone = payload.customer_phone
 
         self.db.commit()
         self.db.refresh(appointment)
