@@ -55,7 +55,6 @@ python-docx==1.2.0
 python-dotenv==1.0.1
 python-jose==3.5.0
 python-multipart==0.0.9
-pywin32==312
 PyYAML==6.0.3
 qdrant-client==1.11.2
 regex==2026.7.19

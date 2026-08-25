@@ -19,6 +19,8 @@ from app.models.knowledge_base import (
 from app.models.staff import Staff
 from app.models.appointment import Appointment
 from app.models.admin import Admin
+from app.models.customer import Customer
+from app.models.chat_session import ChatMessage, ChatSession
 
 
 load_dotenv()
@@ -30,7 +32,6 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 
-# PostgreSQL Configuration
 POSTGRES_USER = os.getenv("POSTGRES_USER")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
@@ -70,7 +71,6 @@ target_metadata = Base.metadata
 
 # Offline Migration
 def run_migrations_offline() -> None:
-    """Run migrations in offline mode."""
 
     url = config.get_main_option("sqlalchemy.url")
 
@@ -87,7 +87,6 @@ def run_migrations_offline() -> None:
 
 # Online Migration
 def run_migrations_online() -> None:
-    """Run migrations in online mode."""
 
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),

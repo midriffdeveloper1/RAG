@@ -8,28 +8,20 @@ const WELCOME_MESSAGE = {
   content: "Hi! Ask me anything about our services, hours, pricing, or policies.",
 };
 
-/**
- * Manages messages for a single chat session. Conversation memory is now
- * server-side (the backend loads and trims history from the database), so
- * this hook just displays whatever session is active and appends to it.
- *
- * @param {string | null} sessionId - existing session to load, or null for a fresh chat
- * @param {{ onSessionCreated?: (id: string) => void }} [options]
- */
-export function useChat(sessionId, { onSessionCreated } = {}) {
+export function useChat(sessionId, customerEmail, { onSessionCreated } = {}) {
   const [messages, setMessages] = useState([WELCOME_MESSAGE]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!sessionId) {
+    if (!sessionId || !customerEmail) {
       setMessages([WELCOME_MESSAGE]);
       return;
     }
     setIsLoadingHistory(true);
     setError(null);
-    getChatSession(sessionId)
+    getChatSession(sessionId, customerEmail)
       .then((session) => {
         setMessages(
           session.messages.map((m, i) => ({ id: `${sessionId}-${i}`, role: m.role, content: m.content }))
@@ -37,11 +29,11 @@ export function useChat(sessionId, { onSessionCreated } = {}) {
       })
       .catch(() => setError("Couldn't load that conversation."))
       .finally(() => setIsLoadingHistory(false));
-  }, [sessionId]);
+  }, [sessionId, customerEmail]);
 
   const sendMessage = useCallback(
     async (text) => {
-      if (!text.trim()) return;
+      if (!text.trim() || !customerEmail) return;
 
       const userMessage = { id: crypto.randomUUID(), role: MESSAGE_ROLE.USER, content: text };
       setMessages((prev) => [...prev, userMessage]);
@@ -49,7 +41,7 @@ export function useChat(sessionId, { onSessionCreated } = {}) {
       setError(null);
 
       try {
-        const response = await sendChatMessage({ question: text, sessionId });
+        const response = await sendChatMessage({ question: text, sessionId, customerEmail });
 
         setMessages((prev) => [
           ...prev,
@@ -71,7 +63,7 @@ export function useChat(sessionId, { onSessionCreated } = {}) {
         setIsSending(false);
       }
     },
-    [sessionId, onSessionCreated]
+    [sessionId, customerEmail, onSessionCreated]
   );
 
   return { messages, isLoading: isSending, isLoadingHistory, error, sendMessage };

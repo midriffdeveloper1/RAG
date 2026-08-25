@@ -1,11 +1,15 @@
 import { useCallback, useState } from "react";
 import ChatSidebar from "../components/Chat/ChatSidebar.jsx";
 import ChatWidget from "../components/Chat/ChatWidget.jsx";
+import EmailGateModal from "../components/Chat/EmailGateModal.jsx";
+import WelcomeToast from "../components/Chat/WelcomeToast.jsx";
+import { useCustomer } from "../context/CustomerContext.jsx";
 import { useChatSessions } from "../hooks/useChatSessions.js";
 
 export default function Home() {
+  const { customer, isIdentified, lastGreeting, clearGreeting, switchAccount } = useCustomer();
   const [activeSessionId, setActiveSessionId] = useState(null);
-  const { sessions, isLoading, refresh, remove } = useChatSessions();
+  const { sessions, isLoading, refresh, remove } = useChatSessions(customer?.email);
 
   const handleSessionCreated = useCallback(
     (sessionId) => {
@@ -25,8 +29,25 @@ export default function Home() {
     [remove]
   );
 
+  const handleSwitchAccount = useCallback(() => {
+    setActiveSessionId(null);
+    switchAccount();
+  }, [switchAccount]);
+
+  if (!isIdentified) {
+    return <EmailGateModal />;
+  }
+
   return (
     <div className="home-page home-page--with-sidebar">
+      {lastGreeting && (
+        <WelcomeToast
+          isReturning={lastGreeting.isReturning}
+          name={customer?.name}
+          onDismiss={clearGreeting}
+        />
+      )}
+
       <ChatSidebar
         sessions={sessions}
         isLoading={isLoading}
@@ -34,12 +55,14 @@ export default function Home() {
         onSelect={setActiveSessionId}
         onNew={handleNew}
         onDelete={handleDelete}
+        onSwitchAccount={handleSwitchAccount}
       />
 
       <div className="home-page__chat-area">
         <ChatWidget
           key={activeSessionId || "new"}
           sessionId={activeSessionId}
+          customerEmail={customer?.email}
           onSessionCreated={handleSessionCreated}
         />
       </div>

@@ -100,7 +100,7 @@ body {
   flex: 1;
   display: flex;
   justify-content: center;
-  padding: 48px 20px;
+  /* padding: 48px 20px; */
   min-height: 0;
 }
 
@@ -1274,4 +1274,168 @@ body {
   text-align: center;
   font-size: 12.5px;
   color: var(--color-text-muted);
+  border-top: 1px solid var(--color-border);
+}
+
+/* --- Email gate modal --- */
+.email-gate {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--color-bg);
+}
+
+.email-gate__card {
+  width: 100%;
+  max-width: 420px;
+  padding: 36px 32px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 32px rgba(47, 69, 56, 0.08);
+}
+
+.email-gate__eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-accent);
+}
+
+.email-gate__title {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 26px;
+  color: var(--color-primary-dark);
+}
+
+.email-gate__subtitle {
+  margin: 0 0 22px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.email-gate__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.email-gate__form input {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  color: var(--color-text);
+}
+
+.email-gate__form input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.email-gate__error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: #a8402f;
+}
+
+.email-gate__form button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14.5px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.email-gate__form button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.email-gate__privacy {
+  margin: 20px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+/* --- Welcome toast (replaces the old in-chat greeting message) --- */
+.welcome-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: var(--color-primary-dark, var(--color-primary));
+  color: #fff;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(47, 69, 56, 0.25);
+  animation: welcome-toast-in 0.2s ease-out;
+}
+
+.welcome-toast__icon {
+  flex-shrink: 0;
+  color: #a8d5b8;
+}
+
+@keyframes welcome-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* --- Sidebar: switch account --- */
+.chat-sidebar__switch-account {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  padding: 9px 10px;
+  margin-top: 4px;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+  background: none;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-sidebar__switch-account:hover {
+  color: var(--color-accent);
 }

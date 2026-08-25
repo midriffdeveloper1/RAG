@@ -14,6 +14,7 @@ class SlotOut(BaseModel):
 
 class AppointmentOut(BaseModel):
     id: int
+    reference_code: str | None = None
     service_id: int
     service_name: str
     staff_id: int

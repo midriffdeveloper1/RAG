@@ -1,5 +1,6 @@
 import difflib
 import re
+import secrets
 from datetime import date as date_type
 from datetime import datetime, timedelta
 
@@ -15,10 +16,21 @@ from app.services.time_utils import day_name, is_valid_email, is_valid_phone, pa
 
 settings = get_settings()
 
+# Unambiguous alphabet (no 0/O/1/I/L) so a spoken/typed reference code can't be
+# misread, and random enough (32^8 combinations) that it can't be brute-forced
+# or guessed the way a sequential integer ID could be.
+_REFERENCE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
+_REFERENCE_LENGTH = 8
+
+
+def generate_reference_code() -> str:
+    return "APT-" + "".join(secrets.choice(_REFERENCE_ALPHABET) for _ in range(_REFERENCE_LENGTH))
+
 
 def to_appointment_out(appointment: Appointment) -> AppointmentOut:
     return AppointmentOut(
         id=appointment.id,
+        reference_code=appointment.reference_code,
         service_id=appointment.service_id,
         service_name=appointment.service.name,
         staff_id=appointment.staff_id,
@@ -125,6 +137,21 @@ class AppointmentService:
 
     def get(self, appointment_id: int) -> Appointment | None:
         return self.db.query(Appointment).filter(Appointment.id == appointment_id).first()
+
+    def get_by_reference(self, reference_code: str) -> Appointment | None:
+        return (
+            self.db.query(Appointment)
+            .filter(Appointment.reference_code == reference_code.strip().upper())
+            .first()
+        )
+
+    def _generate_unique_reference_code(self) -> str:
+        for _ in range(10):
+            code = generate_reference_code()
+            exists = self.db.query(Appointment.id).filter(Appointment.reference_code == code).first()
+            if exists is None:
+                return code
+        raise RuntimeError("Could not generate a unique appointment reference code.")
 
     def _validate_window(self, target_date: date_type) -> str | None:
         today = date_type.today()
@@ -286,6 +313,7 @@ class AppointmentService:
         ).time()
 
         appointment = Appointment(
+            reference_code=self._generate_unique_reference_code(),
             service_id=service.id,
             staff_id=match["staff_id"],
             customer_name=customer_name.strip(),
@@ -301,7 +329,7 @@ class AppointmentService:
         self.db.refresh(appointment)
 
         return {
-            "appointment_id": appointment.id,
+            "appointment_id": appointment.reference_code,
             "service": service.name,
             "staff": match["staff_name"],
             "date": str(target_date),
@@ -312,10 +340,10 @@ class AppointmentService:
 
     # Ownership + policy
 
-    def _verify_owned_booking(self, appointment_id: int, customer_email: str) -> Appointment | dict:
-        appointment = self.get(appointment_id)
+    def _verify_owned_booking(self, reference_code: str, customer_email: str) -> Appointment | dict:
+        appointment = self.get_by_reference(reference_code)
         if appointment is None:
-            return {"error": f"No appointment found with ID {appointment_id}."}
+            return {"error": f"No appointment found with ID {reference_code}."}
         if appointment.customer_email.lower() != customer_email.strip().lower():
             return {"error": "That email doesn't match this appointment's records."}
         if appointment.status != AppointmentStatus.BOOKED:
@@ -331,8 +359,8 @@ class AppointmentService:
             )
         return None
 
-    def cancel(self, appointment_id: int, customer_email: str, reason: str | None = None) -> dict:
-        result = self._verify_owned_booking(appointment_id, customer_email)
+    def cancel(self, reference_code: str, customer_email: str, reason: str | None = None) -> dict:
+        result = self._verify_owned_booking(reference_code, customer_email)
         if isinstance(result, dict):
             return result
         appointment = result
@@ -344,17 +372,17 @@ class AppointmentService:
         appointment.status = AppointmentStatus.CANCELLED
         appointment.cancellation_reason = reason
         self.db.commit()
-        return {"appointment_id": appointment.id, "status": "cancelled"}
+        return {"appointment_id": appointment.reference_code, "status": "cancelled"}
 
     def update_contact(
         self,
-        appointment_id: int,
+        reference_code: str,
         customer_email: str,
         new_name: str | None = None,
         new_email: str | None = None,
         new_phone: str | None = None,
     ) -> dict:
-        result = self._verify_owned_booking(appointment_id, customer_email)
+        result = self._verify_owned_booking(reference_code, customer_email)
         if isinstance(result, dict):
             return result
         appointment = result
@@ -375,7 +403,7 @@ class AppointmentService:
 
         self.db.commit()
         return {
-            "appointment_id": appointment.id,
+            "appointment_id": appointment.reference_code,
             "customer_name": appointment.customer_name,
             "customer_email": appointment.customer_email,
             "customer_phone": appointment.customer_phone,
@@ -384,12 +412,12 @@ class AppointmentService:
 
     def reschedule(
         self,
-        appointment_id: int,
+        reference_code: str,
         customer_email: str,
         new_date_str: str,
         new_start_time_str: str,
     ) -> dict:
-        result = self._verify_owned_booking(appointment_id, customer_email)
+        result = self._verify_owned_booking(reference_code, customer_email)
         if isinstance(result, dict):
             return result
         appointment = result
@@ -418,10 +446,42 @@ class AppointmentService:
         appointment.cancellation_reason = "Rescheduled by customer"
         self.db.commit()
 
-        booking_result["rescheduled_from"] = appointment_id
+        booking_result["rescheduled_from"] = appointment.reference_code
         return booking_result
 
+    def get_details_for_customer(self, reference_code: str, customer_email: str) -> dict:
+        """Look up a single appointment by its public reference code, but only ever
+        return it if the given email matches the appointment's own record. Never
+        distinguishes "wrong ID" from "wrong email" in the error, so a guess can't be
+        used to probe whether a given reference code exists."""
+        if not is_valid_email(customer_email):
+            return {"error": "That email address doesn't look valid."}
+
+        appointment = self.get_by_reference(reference_code)
+        if appointment is None or appointment.customer_email.lower() != customer_email.strip().lower():
+            return {"error": "No appointment found with that ID and email combination."}
+
+        return {
+            "appointment_id": appointment.reference_code,
+            "service": appointment.service.name,
+            "staff": appointment.staff.name,
+            "date": str(appointment.appointment_date),
+            "start_time": appointment.start_time.strftime("%H:%M"),
+            "end_time": appointment.end_time.strftime("%H:%M"),
+            "status": appointment.status.value,
+            "customer_name": appointment.customer_name,
+            "customer_email": appointment.customer_email,
+            "customer_phone": appointment.customer_phone,
+            "notes": appointment.notes,
+            "cancellation_reason": appointment.cancellation_reason,
+        }
+
     def list_for_customer(self, customer_email: str) -> dict:
+        """A short index only — ID, service, date, status. Deliberately does NOT
+        repeat the customer's own name/email/phone on every row (they already
+        know it, and it's not needed to pick which appointment they mean).
+        Full details for one specific appointment come from
+        get_details_for_customer() instead."""
         if not is_valid_email(customer_email):
             return {"error": "That email address doesn't look valid."}
 
@@ -435,16 +495,11 @@ class AppointmentService:
         return {
             "appointments": [
                 {
-                    "appointment_id": a.id,
+                    "appointment_id": a.reference_code,
                     "service": a.service.name,
-                    "staff": a.staff.name,
                     "date": str(a.appointment_date),
                     "start_time": a.start_time.strftime("%H:%M"),
-                    "end_time": a.end_time.strftime("%H:%M"),
                     "status": a.status.value,
-                    "customer_name": a.customer_name,
-                    "customer_email": a.customer_email,
-                    "customer_phone": a.customer_phone,
                 }
                 for a in appointments
             ]

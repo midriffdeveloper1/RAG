@@ -17,6 +17,14 @@ class ChatRequest(BaseModel):
         default=None,
         description="Existing chat session to continue. Omit to start a new one.",
     )
+    customer_email: Optional[str] = Field(
+        default=None,
+        description=(
+            "Email the customer already confirmed via the identify step (e.g. a "
+            "pre-chat modal). When present, the session is bound to this customer "
+            "immediately with no in-chat email handshake needed."
+        ),
+    )
 
 
 class SourceChunk(BaseModel):

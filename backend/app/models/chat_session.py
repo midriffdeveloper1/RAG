@@ -12,12 +12,16 @@ class ChatSession(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     browser_id: Mapped[str] = mapped_column(String(36), index=True, nullable=False)
+    customer_id: Mapped[int | None] = mapped_column(
+        ForeignKey("customers.id"), nullable=True, index=True
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
+    customer: Mapped["Customer | None"] = relationship()
     messages: Mapped[list["ChatMessage"]] = relationship(
         back_populates="session", cascade="all, delete-orphan", order_by="ChatMessage.created_at"
     )

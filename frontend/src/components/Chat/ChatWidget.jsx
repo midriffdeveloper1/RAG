@@ -3,10 +3,12 @@ import ChatWindow from "./ChatWindow.jsx";
 import ChatInput from "./ChatInput.jsx";
 import SuggestedQuestions from "./SuggestedQuestions.jsx";
 
-export default function ChatWidget({ sessionId = null, onSessionCreated }) {
-  const { messages, isLoading, isLoadingHistory, error, sendMessage } = useChat(sessionId, {
-    onSessionCreated,
-  });
+export default function ChatWidget({ sessionId = null, customerEmail, onSessionCreated }) {
+  const { messages, isLoading, isLoadingHistory, error, sendMessage } = useChat(
+    sessionId,
+    customerEmail,
+    { onSessionCreated }
+  );
   const hasUserMessaged = messages.some((m) => m.role === "user");
 
   return (

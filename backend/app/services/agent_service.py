@@ -5,8 +5,10 @@ from datetime import date, datetime
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.models.customer import Customer
 from app.schemas.chat import ChatResponse, ChatTurn
 from app.services.appointment_service import AppointmentService
+from app.services.customer_service import CustomerService
 from app.services.llm_service import get_llm_service
 from app.services.vector_store import get_vector_store
 
@@ -16,9 +18,12 @@ settings = get_settings()
 SYSTEM_PROMPT_TEMPLATE = """You are the front-desk assistant for {business_name}, a {business_description}.
 Today is {today} ({weekday}). Currency is INR (₹).
 
+{customer_context}
+
 You can hold a natural conversation AND take real actions using the tools provided:
 list_services, check_available_slots, book_appointment, reschedule_appointment,
-cancel_appointment, check_customer_appointments, update_appointment_contact, and
+cancel_appointment, check_customer_appointments, get_appointment_by_id,
+update_appointment_contact, update_customer_profile, delete_customer_profile, and
 answer_business_question.
 
 Rules:
@@ -29,7 +34,7 @@ Rules:
    plausible-sounding guess. This applies even to routine-looking details like a location line
    in a booking confirmation — omit it, or fetch it via answer_business_question, never invent it.
 2. When confirming a booking or reporting appointment details back to a customer, quote the
-   name/email/phone exactly as returned by the tool (book_appointment, check_customer_appointments,
+   name/email/phone exactly as returned by the tool (book_appointment, get_appointment_by_id,
    etc.) in that same turn — never reuse or restate values from earlier in the conversation from
    memory, and never substitute a different-looking but similar value.
 3. answer_business_question and list_services are DIFFERENT sources. General descriptions
@@ -44,27 +49,43 @@ Rules:
    explaining why) and either resolve it yourself from that data or ask the customer one
    direct clarifying question.
 5. To book an appointment you must have the customer's full name, email, and phone number.
-   Ask for whatever is missing, one or two things at a time — don't demand all of it up front
-   if the customer hasn't chosen a service and time yet.
+   If the customer's name and/or phone are already known (see above), use them directly and
+   don't ask again — just confirm the details before booking as usual. The instant a customer
+   states their name and/or phone number anywhere in the conversation, even before booking,
+   call update_customer_profile right away to save it — this is the ONLY way it's remembered
+   for the rest of the conversation and future visits, so never skip it and never ask for the
+   same detail twice in one conversation. Only ask for whatever is genuinely still missing.
 6. Before calling book_appointment, always restate the exact service, staff (if chosen), date,
    time, and the customer's name/email/phone in one message and ask them to confirm. Only call
    book_appointment after the customer clearly confirms (e.g. "yes", "confirm", "go ahead").
-   The same applies to reschedule_appointment, cancel_appointment, and
-   update_appointment_contact — confirm the change before calling the tool.
-7. To cancel, reschedule, check details, or correct contact info, you need the appointment ID
-   and the email it was booked under, to
-   confirm it belongs to them. If they don't know the ID, use check_customer_appointments first.
-7. Changes within {cancellation_window_hours} hours of the appointment are not allowed — if a
+   The same applies to reschedule_appointment, cancel_appointment, update_appointment_contact,
+   update_customer_profile, and delete_customer_profile — confirm the change before calling
+   the tool. delete_customer_profile in particular is irreversible; make sure the customer
+   understands their appointment history is kept, but their saved profile (name/email/phone)
+   will be gone, before calling it.
+7. Appointment IDs look like "APT-XXXXXXXX" — always use the exact code the customer gives you
+   or a tool returned, never a plain number. When a customer asks about "my appointment(s)" or
+   booking details, do NOT dump full details for everything they've ever booked. Ask for the
+   specific appointment ID first, then call get_appointment_by_id for that one ID only — it
+   returns full details (times, contact info, notes) for exactly that appointment and nothing
+   else. If they don't know the ID, use check_customer_appointments to show a short list (ID,
+   service, date, status only) so they can pick one — then call get_appointment_by_id for
+   whichever one they choose. The same ID + email pattern applies to reschedule, cancel, and
+   contact corrections.
+8. Changes within {cancellation_window_hours} hours of the appointment are not allowed — if a
    tool reports this, relay it clearly and suggest contacting the business directly. This does
    not apply to update_appointment_contact (correcting a typo isn't a schedule change).
-8. For general questions about the business (pricing philosophy, hours, policies, location,
+9. For general questions about the business (pricing philosophy, hours, policies, location,
    FAQs), call answer_business_question and answer using only what it returns.
-9. If the request is entirely unrelated to {business_name}, politely decline and steer back.
+10. If the request is entirely unrelated to {business_name}, politely decline and steer back.
 
 Style:
 - Keep replies to about 50-80 words. Be direct and warm, never padded.
 - Do not repeat the same stock openers or closers ("I'm sorry", "Thank you", "I'd be happy to")
   turn after turn — vary your phrasing naturally like a real front-desk person would.
+- The customer was already identified before this conversation started — never ask for their
+  email, never say things like "we already have your email on file", and never re-mention or
+  re-confirm it unless they're actively changing it. Treat it as a given, silent fact.
 - Never mention "tools", "functions", "context", or other internal system details.
 """
 
@@ -136,7 +157,10 @@ TOOL_SCHEMAS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "appointment_id": {"type": "integer"},
+                    "appointment_id": {
+                        "type": "string",
+                        "description": "The appointment's reference code, e.g. APT-7K4M9QRT",
+                    },
                     "customer_email": {"type": "string"},
                     "new_date": {"type": "string", "description": "YYYY-MM-DD"},
                     "new_start_time": {"type": "string", "description": "HH:MM, 24-hour"},
@@ -153,7 +177,10 @@ TOOL_SCHEMAS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "appointment_id": {"type": "integer"},
+                    "appointment_id": {
+                        "type": "string",
+                        "description": "The appointment's reference code, e.g. APT-7K4M9QRT",
+                    },
                     "customer_email": {"type": "string"},
                     "reason": {"type": "string"},
                 },
@@ -166,14 +193,42 @@ TOOL_SCHEMAS = [
         "function": {
             "name": "check_customer_appointments",
             "description": (
-                "List a customer's appointments by their email address, including the exact "
-                "name/email/phone on file for each. Use this whenever a customer asks about "
-                "their own booking details — never guess or restate contact info from memory."
+                "Get a short index of a customer's appointments by email — ID, service, date, "
+                "and status only, NOT full contact/time details. Use this only to help a "
+                "customer find an appointment ID they don't remember, then follow up with "
+                "get_appointment_by_id for the one they actually want details on."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {"customer_email": {"type": "string"}},
                 "required": ["customer_email"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_appointment_by_id",
+            "description": (
+                "Look up ONE specific appointment by its reference code, verified against the "
+                "email it was booked under. Returns only that appointment — never any other "
+                "booking on the account, even if the email matches more than one. Use this "
+                "when the customer already has a specific appointment ID and wants its status "
+                "or details, rather than a list of everything they've booked."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "appointment_id": {
+                        "type": "string",
+                        "description": "The appointment's reference code, e.g. APT-7K4M9QRT",
+                    },
+                    "customer_email": {
+                        "type": "string",
+                        "description": "The email to verify against this appointment",
+                    },
+                },
+                "required": ["appointment_id", "customer_email"],
             },
         },
     },
@@ -189,7 +244,10 @@ TOOL_SCHEMAS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "appointment_id": {"type": "integer"},
+                    "appointment_id": {
+                        "type": "string",
+                        "description": "The appointment's reference code, e.g. APT-7K4M9QRT",
+                    },
                     "customer_email": {"type": "string", "description": "The current email on the booking"},
                     "new_name": {"type": "string"},
                     "new_email": {"type": "string"},
@@ -197,6 +255,39 @@ TOOL_SCHEMAS = [
                 },
                 "required": ["appointment_id", "customer_email"],
             },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_customer_profile",
+            "description": (
+                "Update the customer's own saved profile (name, email, and/or phone) — the "
+                "long-term details remembered across future visits so they don't have to be "
+                "re-entered every time. This is the account profile, not any one appointment's "
+                "contact info. Only pass the fields that are changing."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "new_name": {"type": "string"},
+                    "new_email": {"type": "string"},
+                    "new_phone": {"type": "string"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_customer_profile",
+            "description": (
+                "Permanently delete the customer's saved profile (name, email, phone) from our "
+                "records, at their request. Their appointment history is kept regardless — this "
+                "only removes the remembered profile used to skip re-entering details next time. "
+                "Only call this after the customer has explicitly confirmed."
+            ),
+            "parameters": {"type": "object", "properties": {}},
         },
     },
     {
@@ -219,11 +310,38 @@ TOOL_SCHEMAS = [
 
 
 class AgentService:
-    def __init__(self, db: Session) -> None:
+    def __init__(
+        self, db: Session, browser_id: str | None = None, customer: Customer | None = None
+    ) -> None:
         self.db = db
         self.appointments = AppointmentService(db)
+        self.customers = CustomerService(db)
         self.vector_store = get_vector_store()
         self.llm = get_llm_service()
+        self.browser_id = browser_id
+        self.customer = customer
+
+    def _save_kyc_from_booking(self, args: dict) -> None:
+        """After a successful booking, fill in whatever the customer's long-term
+        profile is still missing (name/phone) so future sessions don't need to
+        ask again. Only ever writes to the currently-identified customer, and
+        only if the booking's email matches theirs."""
+        customer = self.customer
+        if customer is None:
+            return
+        booking_email = (args.get("customer_email") or "").strip().lower()
+        if booking_email != customer.email:
+            return
+
+        changed = False
+        if not customer.name and args.get("customer_name"):
+            customer.name = args["customer_name"].strip()
+            changed = True
+        if not customer.phone and args.get("customer_phone"):
+            customer.phone = args["customer_phone"].strip()
+            changed = True
+        if changed:
+            self.db.commit()
 
     def _dispatch(self, name: str, args: dict) -> dict:
         try:
@@ -234,7 +352,7 @@ class AgentService:
                     args["service_name"], args["date"], args.get("staff_name")
                 )
             if name == "book_appointment":
-                return self.appointments.book(
+                result = self.appointments.book(
                     service_name=args["service_name"],
                     date_str=args["date"],
                     start_time_str=args["start_time"],
@@ -243,29 +361,57 @@ class AgentService:
                     customer_phone=args["customer_phone"],
                     staff_name=args.get("staff_name"),
                 )
+                if "error" not in result:
+                    self._save_kyc_from_booking(args)
+                return result
             if name == "reschedule_appointment":
                 return self.appointments.reschedule(
-                    appointment_id=int(args["appointment_id"]),
+                    reference_code=str(args["appointment_id"]),
                     customer_email=args["customer_email"],
                     new_date_str=args["new_date"],
                     new_start_time_str=args["new_start_time"],
                 )
             if name == "cancel_appointment":
                 return self.appointments.cancel(
-                    appointment_id=int(args["appointment_id"]),
+                    reference_code=str(args["appointment_id"]),
                     customer_email=args["customer_email"],
                     reason=args.get("reason"),
                 )
             if name == "check_customer_appointments":
                 return self.appointments.list_for_customer(args["customer_email"])
+            if name == "get_appointment_by_id":
+                return self.appointments.get_details_for_customer(
+                    reference_code=str(args["appointment_id"]),
+                    customer_email=args["customer_email"],
+                )
             if name == "update_appointment_contact":
                 return self.appointments.update_contact(
-                    appointment_id=int(args["appointment_id"]),
+                    reference_code=str(args["appointment_id"]),
                     customer_email=args["customer_email"],
                     new_name=args.get("new_name"),
                     new_email=args.get("new_email"),
                     new_phone=args.get("new_phone"),
                 )
+            if name == "update_customer_profile":
+                if self.customer is None or self.browser_id is None:
+                    return {"error": "I don't have a verified profile for this conversation yet."}
+                result = self.customers.update_profile(
+                    email=self.customer.email,
+                    browser_id=self.browser_id,
+                    new_name=args.get("new_name"),
+                    new_email=args.get("new_email"),
+                    new_phone=args.get("new_phone"),
+                )
+                if "error" not in result:
+                    self.customer = self.customers.get_by_email(result["customer"]["email"])
+                return result
+            if name == "delete_customer_profile":
+                if self.customer is None or self.browser_id is None:
+                    return {"error": "I don't have a verified profile for this conversation yet."}
+                result = self.customers.delete_profile(email=self.customer.email, browser_id=self.browser_id)
+                if "error" not in result:
+                    self.customer = None
+                return result
             if name == "answer_business_question":
                 hits = self.vector_store.search(args["question"])
                 if not hits:
@@ -276,6 +422,27 @@ class AgentService:
             logger.warning("Tool '%s' failed with args %s: %s", name, args, exc)
             return {"error": f"Couldn't complete that — {exc}"}
 
+    def _customer_context(self) -> str:
+        if self.customer is None:
+            return ""
+        parts = [f"email is {self.customer.email}"]
+        if self.customer.name:
+            parts.append(f"name is {self.customer.name}")
+        if self.customer.phone:
+            parts.append(f"phone is {self.customer.phone}")
+        known = ", ".join(parts)
+        if self.customer.name and self.customer.phone:
+            return (
+                f"You already know this customer: {known}. Use these details directly for "
+                "booking or account actions without asking again, unless they explicitly want "
+                "to change something via update_customer_profile."
+            )
+        return (
+            f"You know this much about this customer so far: {known}. Whatever's missing "
+            "(name and/or phone) hasn't been collected yet — get it naturally when they book "
+            "their first appointment, then it will be remembered for next time."
+        )
+
     def _build_messages(self, question: str, history: list[ChatTurn]) -> list[dict]:
         today = date.today()
         system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
@@ -284,6 +451,7 @@ class AgentService:
             today=today.isoformat(),
             weekday=today.strftime("%A"),
             cancellation_window_hours=settings.cancellation_window_hours,
+            customer_context=self._customer_context(),
         )
         max_messages = settings.max_history_exchanges * 2
         trimmed_history = history[-max_messages:] if history else []

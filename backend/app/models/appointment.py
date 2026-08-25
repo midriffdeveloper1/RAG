@@ -18,6 +18,7 @@ class Appointment(Base):
     __tablename__ = "appointments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    reference_code: Mapped[str] = mapped_column(String(20), unique=True, nullable=True, index=True)
     service_id: Mapped[int] = mapped_column(ForeignKey("services.id"), nullable=False)
     staff_id: Mapped[int] = mapped_column(ForeignKey("staff.id"), nullable=False)
 
