@@ -1,18 +1,32 @@
+import math
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_admin
+from app.api.deps import get_current_admin, get_page_params
 from app.core.database import get_db
 from app.models.admin import Admin
-from app.schemas.service import ServiceCreate, ServiceOut, ServiceUpdate
+from app.schemas.common import PageParams
+from app.schemas.service import ServiceCreate, ServiceListResponse, ServiceOut, ServiceUpdate
 from app.services.catalog_service import ServiceCatalogService
 
 router = APIRouter(prefix="/admin/services", tags=["Admin Services"])
 
 
-@router.get("", response_model=list[ServiceOut])
-def list_services(db: Session = Depends(get_db), admin: Admin = Depends(get_current_admin)):
-    return ServiceCatalogService(db).list_all()
+@router.get("", response_model=ServiceListResponse)
+def list_services(
+    params: PageParams = Depends(get_page_params),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin),
+):
+    items, total = ServiceCatalogService(db).list_paginated(params)
+    return ServiceListResponse(
+        items=items,
+        total=total,
+        page=params.page,
+        page_size=params.page_size,
+        total_pages=max(1, math.ceil(total / params.page_size)),
+    )
 
 
 @router.post("", response_model=ServiceOut, status_code=status.HTTP_201_CREATED)

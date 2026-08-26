@@ -27,3 +27,11 @@ class StaffOut(StaffBase):
     services: list[ServiceOut] = []
 
     model_config = {"from_attributes": True}
+
+
+class StaffListResponse(BaseModel):
+    items: list[StaffOut]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

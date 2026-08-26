@@ -23,3 +23,11 @@ class ServiceOut(ServiceBase):
     id: int
 
     model_config = {"from_attributes": True}
+
+
+class ServiceListResponse(BaseModel):
+    items: list[ServiceOut]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

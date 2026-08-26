@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.models.knowledge_base import Business, Service
 from app.models.staff import Staff
+from app.schemas.common import PageParams
 from app.schemas.service import ServiceCreate, ServiceUpdate
 from app.schemas.staff import StaffCreate, StaffUpdate
 
@@ -12,6 +13,12 @@ class ServiceCatalogService:
 
     def list_all(self) -> list[Service]:
         return self.db.query(Service).order_by(Service.name).all()
+
+    def list_paginated(self, params: PageParams) -> tuple[list[Service], int]:
+        query = self.db.query(Service).order_by(Service.name)
+        total = query.count()
+        items = query.offset(params.offset).limit(params.page_size).all()
+        return items, total
 
     def get(self, service_id: int) -> Service | None:
         return self.db.query(Service).filter(Service.id == service_id).first()
@@ -49,6 +56,12 @@ class StaffCatalogService:
 
     def list_all(self) -> list[Staff]:
         return self.db.query(Staff).order_by(Staff.name).all()
+
+    def list_paginated(self, params: PageParams) -> tuple[list[Staff], int]:
+        query = self.db.query(Staff).order_by(Staff.name)
+        total = query.count()
+        items = query.offset(params.offset).limit(params.page_size).all()
+        return items, total
 
     def get(self, staff_id: int) -> Staff | None:
         return self.db.query(Staff).filter(Staff.id == staff_id).first()

@@ -2,7 +2,21 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import appointments, auth, chat, chat_sessions, customers, documents, health, services, staff
+from app.api.routes import (
+    analytics,
+    appointments,
+    auth,
+    business,
+    chat,
+    chat_sessions,
+    chatbot_config,
+    customers,
+    documents,
+    health,
+    public_config,
+    services,
+    staff,
+)
 from app.core.config import get_settings
 from app.db.init_db import init_db
 
@@ -36,6 +50,10 @@ app.include_router(documents.router, prefix=settings.api_v1_prefix)
 app.include_router(services.router, prefix=settings.api_v1_prefix)
 app.include_router(staff.router, prefix=settings.api_v1_prefix)
 app.include_router(appointments.router, prefix=settings.api_v1_prefix)
+app.include_router(business.router, prefix=settings.api_v1_prefix)
+app.include_router(chatbot_config.router, prefix=settings.api_v1_prefix)
+app.include_router(public_config.router, prefix=settings.api_v1_prefix)
+app.include_router(analytics.router, prefix=settings.api_v1_prefix)
 app.include_router(chat.router, prefix=settings.api_v1_prefix)
 app.include_router(chat_sessions.router, prefix=settings.api_v1_prefix)
 app.include_router(customers.router, prefix=settings.api_v1_prefix)

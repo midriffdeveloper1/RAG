@@ -38,9 +38,24 @@ def seed_admin() -> None:
         db.close()
 
 
+def seed_chatbot_config() -> None:
+    from app.models.chatbot_config import ChatbotConfig
+
+    db: Session = SessionLocal()
+    try:
+        existing = db.query(ChatbotConfig).first()
+        if existing is None:
+            db.add(ChatbotConfig())
+            db.commit()
+            logger.info("Seeded default chatbot configuration")
+    finally:
+        db.close()
+
+
 def init_db() -> None:
     create_tables()
     seed_admin()
+    seed_chatbot_config()
 
     from app.db.seed_business import seed_business_catalog
 

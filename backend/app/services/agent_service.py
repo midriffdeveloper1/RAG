@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -16,9 +16,17 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 SYSTEM_PROMPT_TEMPLATE = """You are the front-desk assistant for {business_name}, a {business_description}.
-Today is {today} ({weekday}). Currency is INR (₹).
-
+Currency is INR (₹).
+{tone_instructions}
 {customer_context}
+
+DATE REFERENCE — READ CAREFULLY:
+{date_reference_table}
+Never calculate today's date, a weekday name, or a relative date ("Sunday", "next Friday",
+"tomorrow", "in 3 days") yourself — arithmetic on dates is exactly the kind of thing you get
+wrong. Always resolve it by looking it up in the table above. If a customer's requested day
+isn't in the table (more than 2 weeks out), tell them you can only check availability within
+that window and ask them to narrow it down, rather than guessing a date.
 
 You can hold a natural conversation AND take real actions using the tools provided:
 list_services, check_available_slots, book_appointment, reschedule_appointment,
@@ -48,13 +56,18 @@ Rules:
    with a different guess. Read the error (it may include available_services or a message
    explaining why) and either resolve it yourself from that data or ask the customer one
    direct clarifying question.
-5. To book an appointment you must have the customer's full name, email, and phone number.
-   If the customer's name and/or phone are already known (see above), use them directly and
-   don't ask again — just confirm the details before booking as usual. The instant a customer
-   states their name and/or phone number anywhere in the conversation, even before booking,
-   call update_customer_profile right away to save it — this is the ONLY way it's remembered
-   for the rest of the conversation and future visits, so never skip it and never ask for the
-   same detail twice in one conversation. Only ask for whatever is genuinely still missing.
+5. Collect booking details ONE topic at a time, in this order — never ask for several of these
+   in the same message:
+     a. Which service (or services) they want. Confirm the exact matched name.
+     b. Their preferred date/time. Use check_available_slots and offer real options.
+     c. Only once service + date/time are settled: check whether their name and/or phone are
+        already known (see customer context above). If both are known, use them silently and
+        move straight to the confirmation step (rule 6) — do not mention or re-ask for them.
+        If either is missing, ask for just what's missing, in one short question.
+   The instant a customer states their name and/or phone number anywhere in the conversation,
+   even before booking, call update_customer_profile right away to save it — this is the ONLY
+   way it's remembered for the rest of the conversation and future visits, so never skip it and
+   never ask for the same detail twice in one conversation.
 6. Before calling book_appointment, always restate the exact service, staff (if chosen), date,
    time, and the customer's name/email/phone in one message and ask them to confirm. Only call
    book_appointment after the customer clearly confirms (e.g. "yes", "confirm", "go ahead").
@@ -80,7 +93,7 @@ Rules:
 10. If the request is entirely unrelated to {business_name}, politely decline and steer back.
 
 Style:
-- Keep replies to about 50-80 words. Be direct and warm, never padded.
+- Keep replies to about {reply_word_budget} words. Be direct and warm, never padded.
 - Do not repeat the same stock openers or closers ("I'm sorry", "Thank you", "I'd be happy to")
   turn after turn — vary your phrasing naturally like a real front-desk person would.
 - The customer was already identified before this conversation started — never ask for their
@@ -443,15 +456,62 @@ class AgentService:
             "their first appointment, then it will be remembered for next time."
         )
 
-    def _build_messages(self, question: str, history: list[ChatTurn]) -> list[dict]:
+    def _admin_config(self):
+        """Pull admin-editable business facts + chatbot tone/behaviour from the
+        DB (set via the Admin > Business Details / Chatbot Configuration
+        pages). Falls back to static .env settings if nothing has been
+        configured yet, so this never breaks a fresh install."""
+        from app.models.chatbot_config import ChatbotConfig
+        from app.models.knowledge_base import Business
+
+        business = self.db.query(Business).first()
+        chatbot_config = self.db.query(ChatbotConfig).first()
+
+        business_name = (business.name if business and business.name else None) or settings.business_name
+        business_description = (
+            business.description if business and business.description else None
+        ) or settings.business_description
+
+        tone = chatbot_config.tone if chatbot_config else "friendly"
+        persona_instructions = chatbot_config.persona_instructions if chatbot_config else None
+        reply_word_budget = chatbot_config.max_reply_words if chatbot_config else 80
+
+        return business_name, business_description, tone, persona_instructions, reply_word_budget
+
+    def _date_reference_table(self, days_ahead: int = 14) -> str:
+        """Precompute a correct date->weekday lookup table server-side (Python's
+        date arithmetic is deterministic and always correct) so the LLM never
+        has to compute a weekday or resolve a relative date itself — that's
+        exactly the kind of arithmetic language models get wrong."""
         today = date.today()
+        lines = [f"- Today is {today.strftime('%A')}, {today.isoformat()}."]
+        for offset in range(1, days_ahead + 1):
+            d = today + timedelta(days=offset)
+            label = "Tomorrow" if offset == 1 else d.strftime("%A")
+            lines.append(f"- {label}: {d.isoformat()}")
+        return "\n".join(lines)
+
+    def _build_messages(self, question: str, history: list[ChatTurn]) -> list[dict]:
+        (
+            business_name,
+            business_description,
+            tone,
+            persona_instructions,
+            reply_word_budget,
+        ) = self._admin_config()
+
+        tone_instructions = f"Your tone should be {tone}."
+        if persona_instructions:
+            tone_instructions += f" {persona_instructions}"
+
         system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
-            business_name=settings.business_name,
-            business_description=settings.business_description,
-            today=today.isoformat(),
-            weekday=today.strftime("%A"),
+            business_name=business_name,
+            business_description=business_description,
+            date_reference_table=self._date_reference_table(),
             cancellation_window_hours=settings.cancellation_window_hours,
             customer_context=self._customer_context(),
+            tone_instructions=tone_instructions,
+            reply_word_budget=f"{max(20, reply_word_budget - 20)}-{reply_word_budget}",
         )
         max_messages = settings.max_history_exchanges * 2
         trimmed_history = history[-max_messages:] if history else []

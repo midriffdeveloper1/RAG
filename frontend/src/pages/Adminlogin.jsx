@@ -1,4 +1,4 @@
-import AdminLoginForm from "../components/admin/AdminLoginForm.jsx";
+import AdminLoginForm from "../components/Admin/AdminLoginForm.jsx";
 
 export default function AdminLogin() {
   return (

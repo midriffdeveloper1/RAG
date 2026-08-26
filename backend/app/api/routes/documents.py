@@ -1,9 +1,12 @@
+import math
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
-from app.api.deps import get_current_admin
+from app.api.deps import get_current_admin, get_page_params
 from app.core.database import get_db
 from app.models.admin import Admin
 from app.models.document import Document, DocumentStatus
+from app.schemas.common import PageParams
 from app.schemas.document import DocumentActionResponse, DocumentListResponse, DocumentOut
 from app.services.document_service import DocumentService
 
@@ -43,11 +46,20 @@ def upload_document(
 
 @router.get("", response_model=DocumentListResponse)
 def list_documents(
+    params: PageParams = Depends(get_page_params),
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):
-    documents = db.query(Document).order_by(Document.uploaded_at.desc()).all()
-    return DocumentListResponse(documents=documents, total=len(documents))
+    query = db.query(Document).order_by(Document.uploaded_at.desc())
+    total = query.count()
+    documents = query.offset(params.offset).limit(params.page_size).all()
+    return DocumentListResponse(
+        documents=documents,
+        total=total,
+        page=params.page,
+        page_size=params.page_size,
+        total_pages=max(1, math.ceil(total / params.page_size)),
+    )
 
 
 @router.post("/{document_id}/reindex", response_model=DocumentOut)

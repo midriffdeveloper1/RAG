@@ -1,11 +1,20 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.models.admin import Admin
+from app.schemas.common import PageParams
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=True)
+
+
+def get_page_params(
+    page: int = Query(default=1, ge=1, description="1-indexed page number"),
+    page_size: int = Query(default=10, ge=1, le=100, description="Items per page"),
+) -> PageParams:
+    
+    return PageParams(page=page, page_size=page_size)
 
 
 def get_current_admin(

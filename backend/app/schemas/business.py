@@ -1,0 +1,39 @@
+from pydantic import BaseModel, Field
+
+
+class OpeningHourOut(BaseModel):
+    id: int
+    day_of_week: str
+    open_time: str | None = None
+    close_time: str | None = None
+    is_closed: bool = False
+
+    model_config = {"from_attributes": True}
+
+
+class OpeningHourUpdate(BaseModel):
+    day_of_week: str
+    open_time: str | None = None
+    close_time: str | None = None
+    is_closed: bool = False
+
+
+class BusinessOut(BaseModel):
+    id: int
+    name: str
+    description: str | None = None
+    address: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    opening_hours: list[OpeningHourOut] = []
+
+    model_config = {"from_attributes": True}
+
+
+class BusinessUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+    address: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    opening_hours: list[OpeningHourUpdate] | None = None

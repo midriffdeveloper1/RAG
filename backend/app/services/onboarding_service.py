@@ -19,9 +19,6 @@ INVALID_EMAIL_MESSAGE = (
 
 
 class OnboardingResult:
-    """The reply for this turn, plus any leftover text worth handing to the
-    main agent once the customer is identified (so 'hey it's a@b.com, do you
-    have a slot tomorrow?' doesn't need to be repeated by the customer)."""
 
     def __init__(self, reply: str, remainder: str | None = None, identified: bool = False):
         self.reply = reply
@@ -30,14 +27,21 @@ class OnboardingResult:
 
 
 class OnboardingService:
-    """Every new chat session is short-term memory only (this conversation,
-    until it's cleared) until it's bound to a long-term customer profile via
-    email. This service is the mandatory gate that runs before the agent ever
-    sees a message from an unidentified session."""
 
     def __init__(self, db: Session) -> None:
         self.db = db
         self.customers = CustomerService(db)
+
+    def _ask_email_message(self) -> str:
+        try:
+            from app.models.chatbot_config import ChatbotConfig
+
+            config = self.db.query(ChatbotConfig).first()
+            if config and config.greeting_message:
+                return config.greeting_message
+        except Exception:  # pragma: no cover - defensive, never block onboarding
+            pass
+        return ASK_EMAIL_MESSAGE
 
     def handle(
         self, question: str, session: ChatSession, browser_id: str, is_first_turn: bool
@@ -45,7 +49,7 @@ class OnboardingService:
         match = _EMAIL_PATTERN.search(question)
 
         if is_first_turn and match is None:
-            return OnboardingResult(ASK_EMAIL_MESSAGE)
+            return OnboardingResult(self._ask_email_message())
 
         if match is None:
             return OnboardingResult(INVALID_EMAIL_MESSAGE)

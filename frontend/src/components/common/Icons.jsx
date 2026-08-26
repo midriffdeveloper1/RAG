@@ -238,3 +238,120 @@ export function UserCog(props) {
     </Svg>
   );
 }
+
+export function LayoutDashboard(props) {
+  return (
+    <Svg {...props}>
+      <rect x="3" y="3" width="7" height="9" rx="1.5" />
+      <rect x="14" y="3" width="7" height="5" rx="1.5" />
+      <rect x="14" y="12" width="7" height="9" rx="1.5" />
+      <rect x="3" y="16" width="7" height="5" rx="1.5" />
+    </Svg>
+  );
+}
+
+export function Bot(props) {
+  return (
+    <Svg {...props}>
+      <rect x="4" y="8" width="16" height="12" rx="2.5" />
+      <path d="M12 8V4" />
+      <circle cx="12" cy="3" r="1.2" />
+      <circle cx="9" cy="14" r="1.3" />
+      <circle cx="15" cy="14" r="1.3" />
+      <path d="M9 17.5c1.4.9 4.6.9 6 0" />
+    </Svg>
+  );
+}
+
+export function Building2(props) {
+  return (
+    <Svg {...props}>
+      <rect x="4" y="3" width="10" height="18" rx="1" />
+      <rect x="14" y="9" width="6" height="12" rx="1" />
+      <line x1="7" y1="7" x2="7" y2="7.01" />
+      <line x1="11" y1="7" x2="11" y2="7.01" />
+      <line x1="7" y1="11" x2="7" y2="11.01" />
+      <line x1="11" y1="11" x2="11" y2="11.01" />
+      <line x1="7" y1="15" x2="7" y2="15.01" />
+      <line x1="11" y1="15" x2="11" y2="15.01" />
+    </Svg>
+  );
+}
+
+export function Settings(props) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </Svg>
+  );
+}
+
+export function BarChart3(props) {
+  return (
+    <Svg {...props}>
+      <line x1="4" y1="20" x2="4" y2="10" />
+      <line x1="11" y1="20" x2="11" y2="4" />
+      <line x1="18" y1="20" x2="18" y2="14" />
+      <line x1="3" y1="21" x2="21" y2="21" />
+    </Svg>
+  );
+}
+
+export function Menu(props) {
+  return (
+    <Svg {...props}>
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+    </Svg>
+  );
+}
+
+export function X(props) {
+  return (
+    <Svg {...props}>
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </Svg>
+  );
+}
+
+export function MessageCircle(props) {
+  return (
+    <Svg {...props}>
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </Svg>
+  );
+}
+
+export function Palette(props) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="8.5" cy="10.5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="8" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15.5" cy="10.5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="9.5" cy="14.5" r="1" fill="currentColor" stroke="none" />
+      <path d="M12 21a1.5 1.5 0 0 1 0-3h1a2.5 2.5 0 0 0 0-5h-.5A6.5 6.5 0 1 1 19 8" />
+    </Svg>
+  );
+}
+
+export function ToggleLeft(props) {
+  return (
+    <Svg {...props}>
+      <rect x="1" y="6" width="22" height="12" rx="6" />
+      <circle cx="8" cy="12" r="3.2" fill="currentColor" stroke="none" />
+    </Svg>
+  );
+}
+
+export function ToggleRight(props) {
+  return (
+    <Svg {...props}>
+      <rect x="1" y="6" width="22" height="12" rx="6" />
+      <circle cx="16" cy="12" r="3.2" fill="currentColor" stroke="none" />
+    </Svg>
+  );
+}
