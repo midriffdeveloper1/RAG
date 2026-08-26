@@ -46,7 +46,7 @@ class ChatSessionService:
         return turns[-limit:] if limit else turns
 
 
-    def list_sessions(self, browser_id: str, customer_id: int) -> list[ChatSession]:
+    def list_sessions(self, browser_id: str, customer_id: str) -> list[ChatSession]:
         return (
             self.db.query(ChatSession)
             .filter(ChatSession.browser_id == browser_id, ChatSession.customer_id == customer_id)
@@ -54,7 +54,7 @@ class ChatSessionService:
             .all()
         )
 
-    def get_session(self, session_id: str, browser_id: str, customer_id: int) -> ChatSession | None:
+    def get_session(self, session_id: str, browser_id: str, customer_id: str) -> ChatSession | None:
         return (
             self.db.query(ChatSession)
             .filter(
@@ -65,7 +65,7 @@ class ChatSessionService:
             .first()
         )
 
-    def delete_session(self, session_id: str, browser_id: str, customer_id: int) -> bool:
+    def delete_session(self, session_id: str, browser_id: str, customer_id: str) -> bool:
         session = self.get_session(session_id, browser_id, customer_id)
         if session is None:
             return False
