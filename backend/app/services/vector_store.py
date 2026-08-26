@@ -64,13 +64,14 @@ class VectorStoreService:
         self.client.create_payload_index(
             collection_name=self.collection_name,
             field_name="document_id",
-            field_schema=qmodels.PayloadSchemaType.INTEGER,
+            
+            field_schema=qmodels.PayloadSchemaType.KEYWORD,
         )
 
 
     def upsert_document_chunks(
         self,
-        document_id: int,
+        document_id: str,
         chunks: list[str],
         source_filename: str,
         version: int,
@@ -106,7 +107,7 @@ class VectorStoreService:
         return total_written
 
    
-    def delete_by_document_id(self, document_id: int) -> None:
+    def delete_by_document_id(self, document_id: str) -> None:
         self.ensure_collection()
         self.client.delete(
             collection_name=self.collection_name,

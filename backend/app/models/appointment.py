@@ -6,6 +6,7 @@ from sqlalchemy import Date, DateTime, Enum, ForeignKey, String, Text, Time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.core.ids import generate_id
 
 
 class AppointmentStatus(str, enum.Enum):
@@ -17,10 +18,10 @@ class AppointmentStatus(str, enum.Enum):
 class Appointment(Base):
     __tablename__ = "appointments"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[str] = mapped_column(String(16), primary_key=True, default=generate_id)
     reference_code: Mapped[str] = mapped_column(String(20), unique=True, nullable=True, index=True)
-    service_id: Mapped[int] = mapped_column(ForeignKey("services.id"), nullable=False)
-    staff_id: Mapped[int] = mapped_column(ForeignKey("staff.id"), nullable=False)
+    service_id: Mapped[str] = mapped_column(String(16), ForeignKey("services.id"), nullable=False)
+    staff_id: Mapped[str] = mapped_column(String(16), ForeignKey("staff.id"), nullable=False)
 
     customer_name: Mapped[str] = mapped_column(String(255), nullable=False)
     customer_email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)

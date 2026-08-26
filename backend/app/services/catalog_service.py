@@ -20,7 +20,7 @@ class ServiceCatalogService:
         items = query.offset(params.offset).limit(params.page_size).all()
         return items, total
 
-    def get(self, service_id: int) -> Service | None:
+    def get(self, service_id: str) -> Service | None:
         return self.db.query(Service).filter(Service.id == service_id).first()
 
     def create(self, payload: ServiceCreate) -> Service:
@@ -31,7 +31,7 @@ class ServiceCatalogService:
         self.db.refresh(service)
         return service
 
-    def update(self, service_id: int, payload: ServiceUpdate) -> Service | None:
+    def update(self, service_id: str, payload: ServiceUpdate) -> Service | None:
         service = self.get(service_id)
         if service is None:
             return None
@@ -41,7 +41,7 @@ class ServiceCatalogService:
         self.db.refresh(service)
         return service
 
-    def delete(self, service_id: int) -> bool:
+    def delete(self, service_id: str) -> bool:
         service = self.get(service_id)
         if service is None:
             return False
@@ -63,10 +63,10 @@ class StaffCatalogService:
         items = query.offset(params.offset).limit(params.page_size).all()
         return items, total
 
-    def get(self, staff_id: int) -> Staff | None:
+    def get(self, staff_id: str) -> Staff | None:
         return self.db.query(Staff).filter(Staff.id == staff_id).first()
 
-    def _resolve_services(self, service_ids: list[int]) -> list[Service]:
+    def _resolve_services(self, service_ids: list[str]) -> list[Service]:
         if not service_ids:
             return []
         return self.db.query(Service).filter(Service.id.in_(service_ids)).all()
@@ -84,7 +84,7 @@ class StaffCatalogService:
         self.db.refresh(staff)
         return staff
 
-    def update(self, staff_id: int, payload: StaffUpdate) -> Staff | None:
+    def update(self, staff_id: str, payload: StaffUpdate) -> Staff | None:
         staff = self.get(staff_id)
         if staff is None:
             return None
@@ -97,7 +97,7 @@ class StaffCatalogService:
         self.db.refresh(staff)
         return staff
 
-    def delete(self, staff_id: int) -> bool:
+    def delete(self, staff_id: str) -> bool:
         staff = self.get(staff_id)
         if staff is None:
             return False

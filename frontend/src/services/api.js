@@ -56,6 +56,16 @@ export async function deleteChatSession(sessionId, customerEmail) {
   });
 }
 
+export function discardChatSessionOnUnload(sessionId) {
+  if (!sessionId) return;
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+  const url = `${baseUrl}/chat/sessions/${sessionId}/discard`;
+  const body = new Blob([JSON.stringify({ browser_id: getBrowserId() })], {
+    type: "application/json",
+  });
+  navigator.sendBeacon?.(url, body);
+}
+
 export async function checkHealth() {
   const { data } = await apiClient.get("/health");
   return data;

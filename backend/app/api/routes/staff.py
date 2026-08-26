@@ -40,7 +40,7 @@ def create_staff(
 
 @router.patch("/{staff_id}", response_model=StaffOut)
 def update_staff(
-    staff_id: int,
+    staff_id: str,
     payload: StaffUpdate,
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
@@ -53,7 +53,7 @@ def update_staff(
 
 @router.delete("/{staff_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_staff(
-    staff_id: int,
+    staff_id: str,
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):

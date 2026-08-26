@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from groq import GroqError
 from sqlalchemy.orm import Session
 
@@ -17,8 +17,22 @@ router = APIRouter(tags=["Chat"])
 settings = get_settings()
 
 
+def _purge_stale_sessions_task() -> None:
+    from app.core.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        removed = ChatSessionService(db).purge_stale_sessions(settings.chat_session_retention_hours)
+        if removed:
+            logger.info("Purged %s stale chat session(s)", removed)
+    finally:
+        db.close()
+
+
 @router.post("/chat", response_model=ChatResponse)
-def chat_endpoint(payload: ChatRequest, db: Session = Depends(get_db)):
+def chat_endpoint(payload: ChatRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    background_tasks.add_task(_purge_stale_sessions_task)
+
     sessions = ChatSessionService(db)
     session = sessions.get_or_create(payload.browser_id, payload.session_id)
 
@@ -45,7 +59,7 @@ def chat_endpoint(payload: ChatRequest, db: Session = Depends(get_db)):
                 follow_up = agent.answer(result.remainder, session.id, [])
                 answer = f"{answer}\n\n{follow_up.answer}"
             except (RuntimeError, GroqError):
-                pass  # the greeting alone is still a valid reply for this turn
+                pass  
 
         sessions.append_message(session, "assistant", answer)
         return ChatResponse(answer=answer, sources=[], session_id=session.id)

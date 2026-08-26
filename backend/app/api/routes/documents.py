@@ -13,7 +13,7 @@ from app.services.document_service import DocumentService
 router = APIRouter(prefix="/admin/documents", tags=["Admin Documents"])
 
 
-def _get_document_or_404(document_id: int, db: Session) -> Document:
+def _get_document_or_404(document_id: str, db: Session) -> Document:
     document = db.query(Document).filter(Document.id == document_id).first()
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
@@ -64,7 +64,7 @@ def list_documents(
 
 @router.post("/{document_id}/reindex", response_model=DocumentOut)
 def reindex_document(
-    document_id: int,
+    document_id: str,
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):
@@ -76,7 +76,7 @@ def reindex_document(
 
 @router.delete("/{document_id}", response_model=DocumentActionResponse)
 def delete_document(
-    document_id: int,
+    document_id: str,
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):

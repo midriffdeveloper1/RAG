@@ -105,6 +105,18 @@ class DocumentService:
             document.chunk_count = written
             document.error_message = None
             document.processed_at = datetime.utcnow()
+            self.db.commit()
+
+            try:
+                from app.services.document_extraction_service import DocumentExtractionService
+
+                summary = DocumentExtractionService(self.db).extract_and_apply(raw_text)
+                document.extraction_summary = summary.to_text()
+            except Exception:
+                logger.exception(
+                    "Document field extraction failed for document_id=%s (RAG indexing already succeeded)",
+                    document.id,
+                )
 
         except Exception as exc:  
             logger.exception("Failed to process document_id=%s", document.id)

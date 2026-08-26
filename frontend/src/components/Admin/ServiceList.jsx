@@ -149,10 +149,11 @@ export default function ServiceList() {
                       <input
                         type="number"
                         className="catalog-inline-input"
-                        defaultValue={service.price}
+                        placeholder="Not set"
+                        defaultValue={service.price ?? ""}
                         disabled={busyId === service.id}
                         onBlur={(e) => {
-                          const value = Number(e.target.value);
+                          const value = e.target.value === "" ? null : Number(e.target.value);
                           if (value !== service.price) handleFieldUpdate(service, "price", value);
                         }}
                       />
@@ -161,10 +162,11 @@ export default function ServiceList() {
                       <input
                         type="number"
                         className="catalog-inline-input"
-                        defaultValue={service.duration_minutes}
+                        placeholder="Not set"
+                        defaultValue={service.duration_minutes ?? ""}
                         disabled={busyId === service.id}
                         onBlur={(e) => {
-                          const value = Number(e.target.value);
+                          const value = e.target.value === "" ? null : Number(e.target.value);
                           if (value !== service.duration_minutes) {
                             handleFieldUpdate(service, "duration_minutes", value);
                           }

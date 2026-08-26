@@ -11,10 +11,6 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-def create_tables() -> None:
-    Base.metadata.create_all(bind=engine)
-
-
 def seed_admin() -> None:
    
     db: Session = SessionLocal()
@@ -53,10 +49,10 @@ def seed_chatbot_config() -> None:
 
 
 def init_db() -> None:
-    create_tables()
+    # create_tables()
     seed_admin()
-    seed_chatbot_config()
+    # seed_chatbot_config()
 
-    from app.db.seed_business import seed_business_catalog
+    # from app.db.seed_business import seed_business_catalog
 
-    seed_business_catalog()
+    # seed_business_catalog()

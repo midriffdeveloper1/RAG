@@ -34,8 +34,21 @@ CONTEXT:
 
 
 class RAGService:
-    def __init__(self, vector_store: VectorStoreService | None = None) -> None:
+    def __init__(self, db=None, vector_store: VectorStoreService | None = None) -> None:
+        self.db = db
         self.vector_store = vector_store or get_vector_store()
+
+    def _business_info(self) -> tuple[str, str]:
+        if self.db is not None:
+            from app.models.knowledge_base import Business
+
+            business = self.db.query(Business).first()
+            if business is not None:
+                return (
+                    business.name or settings.business_name,
+                    business.description or settings.business_description,
+                )
+        return settings.business_name, settings.business_description
 
     # History 
 
@@ -81,13 +94,14 @@ class RAGService:
         self, question: str, context: list[SourceChunk], history: list[ChatTurn]
     ) -> str:
         llm = get_llm_service()
+        business_name, business_description = self._business_info()
 
         context_block = "\n\n".join(
             f"[Source: {chunk.source}]\n{chunk.content}" for chunk in context
         )
         system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
-            business_name=settings.business_name,
-            business_description=settings.business_description,
+            business_name=business_name,
+            business_description=business_description,
             history=self._format_history(history),
             context=context_block,
         )
@@ -102,10 +116,11 @@ class RAGService:
         history = self._trim_history(history or [])
         search_query = self._build_search_query(question, history)
         context = self.retrieve_context(search_query)
-        
+        business_name, _ = self._business_info()
+
         if self._is_out_of_domain(context):
             return ChatResponse(
-                answer=OUT_OF_DOMAIN_MESSAGE.format(business_name=settings.business_name),
+                answer=OUT_OF_DOMAIN_MESSAGE.format(business_name=business_name),
                 sources=[],
                 session_id=session_id,
             )

@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel
 from app.models.document import DocumentStatus
 class DocumentOut(BaseModel):
-    id: int
+    id: str
     original_filename: str
     file_type: str
     file_size_bytes: int
@@ -13,6 +13,7 @@ class DocumentOut(BaseModel):
     version: int
     uploaded_at: datetime
     processed_at: Optional[datetime] = None
+    extraction_summary: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -26,6 +27,6 @@ class DocumentListResponse(BaseModel):
 
 
 class DocumentActionResponse(BaseModel):
-    id: int
+    id: str
     status: DocumentStatus
     message: str

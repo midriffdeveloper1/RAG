@@ -135,7 +135,7 @@ class AppointmentService:
             ]
         }
 
-    def get(self, appointment_id: int) -> Appointment | None:
+    def get(self, appointment_id: str) -> Appointment | None:
         return self.db.query(Appointment).filter(Appointment.id == appointment_id).first()
 
     def get_by_reference(self, reference_code: str) -> Appointment | None:
@@ -168,7 +168,7 @@ class AppointmentService:
         service_name: str,
         date_str: str,
         staff_name: str | None = None,
-        exclude_appointment_id: int | None = None,
+        exclude_appointment_id: str | None = None,
     ) -> dict:
         service = self._get_service(service_name)
         if service is None:
@@ -269,7 +269,7 @@ class AppointmentService:
         customer_email: str,
         customer_phone: str,
         staff_name: str | None = None,
-        exclude_appointment_id: int | None = None,
+        exclude_appointment_id: str | None = None,
     ) -> dict:
         if not customer_name or not customer_name.strip():
             return {"error": "Customer name is required to book."}
@@ -510,7 +510,7 @@ class AppointmentService:
     def admin_list(
         self,
         status: AppointmentStatus | None = None,
-        staff_id: int | None = None,
+        staff_id: str | None = None,
         customer_email: str | None = None,
         date_from: date_type | None = None,
         date_to: date_type | None = None,
@@ -533,7 +533,7 @@ class AppointmentService:
         page: int = 1,
         page_size: int = 10,
         status: AppointmentStatus | None = None,
-        staff_id: int | None = None,
+        staff_id: str | None = None,
         customer_email: str | None = None,
         date_from: date_type | None = None,
         date_to: date_type | None = None,
@@ -555,7 +555,7 @@ class AppointmentService:
         items = query.offset((page - 1) * page_size).limit(page_size).all()
         return items, total
 
-    def admin_update(self, appointment_id: int, payload: AdminAppointmentUpdate) -> Appointment:
+    def admin_update(self, appointment_id: str, payload: AdminAppointmentUpdate) -> Appointment:
         appointment = self.get(appointment_id)
         if appointment is None:
             raise ValueError("Appointment not found.")
@@ -587,7 +587,7 @@ class AppointmentService:
         self.db.refresh(appointment)
         return appointment
 
-    def admin_delete(self, appointment_id: int) -> bool:
+    def admin_delete(self, appointment_id: str) -> bool:
         appointment = self.get(appointment_id)
         if appointment is None:
             return False

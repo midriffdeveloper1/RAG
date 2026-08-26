@@ -44,3 +44,5 @@ qdrant/
 
 # --- Logs ---
 *.log
+
+*.zip

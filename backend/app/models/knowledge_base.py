@@ -3,6 +3,7 @@ from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.core.ids import generate_id
 
 class Business(Base):
     __tablename__ = "business"
@@ -23,7 +24,7 @@ class Business(Base):
 class Service(Base):
     __tablename__ = "services"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[str] = mapped_column(String(16), primary_key=True, default=generate_id)
     business_id: Mapped[int] = mapped_column(ForeignKey("business.id"))
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)

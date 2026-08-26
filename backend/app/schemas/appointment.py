@@ -8,16 +8,16 @@ from app.models.appointment import AppointmentStatus
 class SlotOut(BaseModel):
     start_time: time
     end_time: time
-    staff_id: int
+    staff_id: str
     staff_name: str
 
 
 class AppointmentOut(BaseModel):
-    id: int
+    id: str
     reference_code: str | None = None
-    service_id: int
+    service_id: str
     service_name: str
-    staff_id: int
+    staff_id: str
     staff_name: str
     customer_name: str
     customer_email: str
@@ -43,7 +43,7 @@ class AppointmentListResponse(BaseModel):
 class AdminAppointmentUpdate(BaseModel):
     appointment_date: date | None = None
     start_time: time | None = None
-    staff_id: int | None = None
+    staff_id: str | None = None
     status: AppointmentStatus | None = None
     notes: str | None = None
     cancellation_reason: str | None = None

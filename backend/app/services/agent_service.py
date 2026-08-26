@@ -15,18 +15,25 @@ from app.services.vector_store import get_vector_store
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-SYSTEM_PROMPT_TEMPLATE = """You are the front-desk assistant for {business_name}, a {business_description}.
+SYSTEM_PROMPT_TEMPLATE = """=== BUSINESS IDENTITY — from Admin > Business Details (database) ===
+You are the front-desk assistant for {business_name}, a {business_description}.
 Currency is INR (₹).
+
+=== VOICE & TONE — from Admin > Chatbot Configuration ({tone}) ===
 {tone_instructions}
+
+=== CUSTOMER CONTEXT — this visitor's saved profile, if identified ===
 {customer_context}
 
-DATE REFERENCE — READ CAREFULLY:
+=== DATE REFERENCE — computed fresh from the server clock this turn ===
 {date_reference_table}
 Never calculate today's date, a weekday name, or a relative date ("Sunday", "next Friday",
 "tomorrow", "in 3 days") yourself — arithmetic on dates is exactly the kind of thing you get
 wrong. Always resolve it by looking it up in the table above. If a customer's requested day
 isn't in the table (more than 2 weeks out), tell them you can only check availability within
 that window and ask them to narrow it down, rather than guessing a date.
+
+=== TOOLS & BOOKING RULES ===
 
 You can hold a natural conversation AND take real actions using the tools provided:
 list_services, check_available_slots, book_appointment, reschedule_appointment,
@@ -68,7 +75,21 @@ Rules:
    even before booking, call update_customer_profile right away to save it — this is the ONLY
    way it's remembered for the rest of the conversation and future visits, so never skip it and
    never ask for the same detail twice in one conversation.
-6. Before calling book_appointment, always restate the exact service, staff (if chosen), date,
+5a. NEVER name a specific staff member — in a confirmation summary, in passing, or anywhere
+    else — until check_available_slots has been called for that exact service + date + time and
+    actually returned that person's name in a slot. This applies even if the customer mentioned
+    that staff member earlier for a different service or time, or if you're just guessing who's
+    "usually" available — always requery. Concretely:
+      - If the customer hasn't stated a staff preference, call check_available_slots first, then
+        pick one of the staff names it actually returned. Only present the confirmation (rule 6)
+        after you've done this — never draft a confirmation with a placeholder or assumed staff
+        name and fill it in later.
+      - If the customer names a specific staff member, check_available_slots has a `staff_name`
+        parameter — pass it through. If the tool returns an error (that person doesn't perform
+        this service, or has no free slot at that time), relay it plainly and offer the
+        alternatives the tool gives you — do not silently swap in a different name yourself.
+6. Before calling book_appointment, always restate the exact service, staff (a name that
+   check_available_slots actually returned for this service+date+time — see rule 5a), date,
    time, and the customer's name/email/phone in one message and ask them to confirm. Only call
    book_appointment after the customer clearly confirms (e.g. "yes", "confirm", "go ahead").
    The same applies to reschedule_appointment, cancel_appointment, update_appointment_contact,
@@ -92,7 +113,7 @@ Rules:
    FAQs), call answer_business_question and answer using only what it returns.
 10. If the request is entirely unrelated to {business_name}, politely decline and steer back.
 
-Style:
+=== STYLE — length from Admin > Chatbot Configuration, phrasing rules fixed ===
 - Keep replies to about {reply_word_budget} words. Be direct and warm, never padded.
 - Do not repeat the same stock openers or closers ("I'm sorry", "Thank you", "I'd be happy to")
   turn after turn — vary your phrasing naturally like a real front-desk person would.
@@ -100,13 +121,19 @@ Style:
   email, never say things like "we already have your email on file", and never re-mention or
   re-confirm it unless they're actively changing it. Treat it as a given, silent fact.
 - Never mention "tools", "functions", "context", or other internal system details.
+
+=== FALLBACK — from Admin > Chatbot Configuration ===
+If you genuinely cannot help after multiple attempts, the admin-configured fallback message to
+draw on (adapt it naturally to the conversation, don't recite it verbatim if it reads oddly
+in context) is: "{fallback_message}"
 """
 
 NO_TOOLS_FALLBACK_PROMPT = (
     "You couldn't complete the requested action after several attempts. Based on the "
     "conversation so far, tell the customer plainly what's missing or unclear and ask one "
     "direct question to move forward. Don't apologize more than once and don't repeat "
-    "phrasing you've already used in this conversation."
+    "phrasing you've already used in this conversation. If nothing else fits, fall back to "
+    "the admin-configured fallback message provided in the system prompt above."
 )
 
 TOOL_SCHEMAS = [
@@ -333,6 +360,8 @@ class AgentService:
         self.llm = get_llm_service()
         self.browser_id = browser_id
         self.customer = customer
+        
+        self._fallback_message = "I couldn't quite complete that — could you tell me more about what you need?"
 
     def _save_kyc_from_booking(self, args: dict) -> None:
         """After a successful booking, fill in whatever the customer's long-term
@@ -426,10 +455,18 @@ class AgentService:
                     self.customer = None
                 return result
             if name == "answer_business_question":
+                from app.services.business_lookup_service import BusinessLookupService
+                from app.models.knowledge_base import Business
+
+                business = self.db.query(Business).first()
+                db_answer = BusinessLookupService(self.db).answer(business, args["question"])
+                if db_answer:
+                    return {"context": db_answer, "source": "database"}
+
                 hits = self.vector_store.search(args["question"])
                 if not hits:
                     return {"context": "No matching information found in the knowledge base."}
-                return {"context": "\n\n".join(h["text"] for h in hits)}
+                return {"context": "\n\n".join(h["text"] for h in hits), "source": "uploaded_documents"}
             return {"error": f"Unknown tool '{name}'."}
         except (KeyError, ValueError, TypeError) as exc:
             logger.warning("Tool '%s' failed with args %s: %s", name, args, exc)
@@ -457,10 +494,6 @@ class AgentService:
         )
 
     def _admin_config(self):
-        """Pull admin-editable business facts + chatbot tone/behaviour from the
-        DB (set via the Admin > Business Details / Chatbot Configuration
-        pages). Falls back to static .env settings if nothing has been
-        configured yet, so this never breaks a fresh install."""
         from app.models.chatbot_config import ChatbotConfig
         from app.models.knowledge_base import Business
 
@@ -475,14 +508,15 @@ class AgentService:
         tone = chatbot_config.tone if chatbot_config else "friendly"
         persona_instructions = chatbot_config.persona_instructions if chatbot_config else None
         reply_word_budget = chatbot_config.max_reply_words if chatbot_config else 80
+        fallback_message = (
+            chatbot_config.fallback_message
+            if chatbot_config and chatbot_config.fallback_message
+            else "I couldn't quite complete that — could you tell me more about what you need?"
+        )
 
-        return business_name, business_description, tone, persona_instructions, reply_word_budget
+        return business_name, business_description, tone, persona_instructions, reply_word_budget, fallback_message
 
     def _date_reference_table(self, days_ahead: int = 14) -> str:
-        """Precompute a correct date->weekday lookup table server-side (Python's
-        date arithmetic is deterministic and always correct) so the LLM never
-        has to compute a weekday or resolve a relative date itself — that's
-        exactly the kind of arithmetic language models get wrong."""
         today = date.today()
         lines = [f"- Today is {today.strftime('%A')}, {today.isoformat()}."]
         for offset in range(1, days_ahead + 1):
@@ -498,7 +532,9 @@ class AgentService:
             tone,
             persona_instructions,
             reply_word_budget,
+            fallback_message,
         ) = self._admin_config()
+        self._fallback_message = fallback_message  # stashed for _final_fallback_reply
 
         tone_instructions = f"Your tone should be {tone}."
         if persona_instructions:
@@ -511,7 +547,9 @@ class AgentService:
             cancellation_window_hours=settings.cancellation_window_hours,
             customer_context=self._customer_context(),
             tone_instructions=tone_instructions,
+            tone=tone,
             reply_word_budget=f"{max(20, reply_word_budget - 20)}-{reply_word_budget}",
+            fallback_message=fallback_message,
         )
         max_messages = settings.max_history_exchanges * 2
         trimmed_history = history[-max_messages:] if history else []
@@ -520,6 +558,10 @@ class AgentService:
         messages.extend({"role": turn.role, "content": turn.content} for turn in trimmed_history)
         messages.append({"role": "user", "content": question})
         return messages
+
+    def preview_system_prompt(self) -> str:
+        messages = self._build_messages("(preview — no real customer question)", [])
+        return messages[0]["content"]
 
     def answer(
         self, question: str, session_id: str | None = None, history: list[ChatTurn] | None = None
@@ -575,4 +617,4 @@ class AgentService:
                 return final.content
         except Exception:  # noqa: BLE001 - best-effort fallback, never raise here
             logger.exception("Fallback reply generation failed")
-        return "Let's take that one step at a time — could you tell me what you'd like to do next?"
+        return self._fallback_message

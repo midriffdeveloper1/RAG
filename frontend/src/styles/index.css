@@ -999,6 +999,17 @@ body {
   margin-top: 2px;
 }
 
+.data-table__extraction-note {
+  display: block;
+  font-size: 11.5px;
+  color: #1f7a44;
+  margin-top: 2px;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .data-table__actions {
   display: flex;
   align-items: center;

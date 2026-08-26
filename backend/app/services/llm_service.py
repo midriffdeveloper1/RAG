@@ -19,11 +19,17 @@ class LLMService:
         self.client = Groq(api_key=settings.groq_api_key)
         self.model = settings.groq_model
 
-    def generate(self, system_prompt: str, user_prompt: str) -> str:
+    def generate(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> str:
         response = self.client.chat.completions.create(
             model=self.model,
-            temperature=settings.groq_temperature,
-            max_tokens=settings.groq_max_tokens,
+            temperature=settings.groq_temperature if temperature is None else temperature,
+            max_tokens=settings.groq_max_tokens if max_tokens is None else max_tokens,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},

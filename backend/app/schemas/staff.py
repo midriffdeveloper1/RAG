@@ -11,7 +11,7 @@ class StaffBase(BaseModel):
 
 
 class StaffCreate(StaffBase):
-    service_ids: list[int] = []
+    service_ids: list[str] = []
 
 
 class StaffUpdate(BaseModel):
@@ -19,11 +19,11 @@ class StaffUpdate(BaseModel):
     email: str | None = None
     phone: str | None = None
     is_active: bool | None = None
-    service_ids: list[int] | None = None
+    service_ids: list[str] | None = None
 
 
 class StaffOut(StaffBase):
-    id: int
+    id: str
     services: list[ServiceOut] = []
 
     model_config = {"from_attributes": True}

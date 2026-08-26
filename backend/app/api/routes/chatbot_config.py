@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin
@@ -46,3 +46,15 @@ def update_chatbot_config(
 ):
     config = ChatbotConfigService(db).update(payload)
     return _to_out(config)
+
+
+@router.get("/preview-prompt")
+def preview_system_prompt(db: Session = Depends(get_db), admin: Admin = Depends(get_current_admin)):
+    
+    from app.services.agent_service import AgentService
+
+    try:
+        agent = AgentService(db)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    return {"prompt": agent.preview_system_prompt()}

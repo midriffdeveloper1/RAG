@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { getChatSession, sendChatMessage } from "../services/api.js";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { discardChatSessionOnUnload, getChatSession, sendChatMessage } from "../services/api.js";
 import { MESSAGE_ROLE } from "../utils/constants.js";
 
 const WELCOME_MESSAGE = {
@@ -13,6 +13,11 @@ export function useChat(sessionId, customerEmail, { onSessionCreated } = {}) {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState(null);
+  const liveSessionIdRef = useRef(sessionId);
+
+  useEffect(() => {
+    liveSessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   useEffect(() => {
     if (!sessionId || !customerEmail) {
@@ -30,6 +35,19 @@ export function useChat(sessionId, customerEmail, { onSessionCreated } = {}) {
       .catch(() => setError("Couldn't load that conversation."))
       .finally(() => setIsLoadingHistory(false));
   }, [sessionId, customerEmail]);
+
+  
+  useEffect(() => {
+    function handleUnload() {
+      discardChatSessionOnUnload(liveSessionIdRef.current);
+    }
+    window.addEventListener("pagehide", handleUnload);
+    window.addEventListener("beforeunload", handleUnload);
+    return () => {
+      window.removeEventListener("pagehide", handleUnload);
+      window.removeEventListener("beforeunload", handleUnload);
+    };
+  }, []);
 
   const sendMessage = useCallback(
     async (text) => {
@@ -49,6 +67,7 @@ export function useChat(sessionId, customerEmail, { onSessionCreated } = {}) {
         ]);
 
         if (!sessionId && response.session_id) {
+          liveSessionIdRef.current = response.session_id;
           onSessionCreated?.(response.session_id);
         }
       } catch (err) {

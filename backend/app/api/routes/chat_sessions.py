@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -9,7 +10,11 @@ from app.services.customer_service import CustomerService
 router = APIRouter(prefix="/chat/sessions", tags=["Chat Sessions"])
 
 
-def _resolve_customer_id(customer_email: str, db: Session) -> int:
+class DiscardSessionRequest(BaseModel):
+    browser_id: str
+
+
+def _resolve_customer_id(customer_email: str, db: Session) -> str:
     customer = CustomerService(db).get_by_email(customer_email)
     if customer is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No profile found for that email.")
@@ -52,3 +57,9 @@ def delete_session(
     deleted = ChatSessionService(db).delete_session(session_id, browser_id, customer_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+
+@router.post("/{session_id}/discard", status_code=status.HTTP_204_NO_CONTENT)
+def discard_session(session_id: str, payload: DiscardSessionRequest, db: Session = Depends(get_db)):
+    
+    ChatSessionService(db).discard_session(session_id, payload.browser_id)

@@ -16,7 +16,7 @@ router = APIRouter(prefix="/admin/appointments", tags=["Admin Appointments"])
 @router.get("", response_model=AppointmentListResponse)
 def list_appointments(
     status_filter: AppointmentStatus | None = Query(default=None, alias="status"),
-    staff_id: int | None = None,
+    staff_id: str | None = None,
     customer_email: str | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
@@ -37,7 +37,7 @@ def list_appointments(
 
 @router.get("/{appointment_id}", response_model=AppointmentOut)
 def get_appointment(
-    appointment_id: int,
+    appointment_id: str,
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):
@@ -49,7 +49,7 @@ def get_appointment(
 
 @router.patch("/{appointment_id}", response_model=AppointmentOut)
 def update_appointment(
-    appointment_id: int,
+    appointment_id: str,
     payload: AdminAppointmentUpdate,
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
@@ -63,7 +63,7 @@ def update_appointment(
 
 @router.delete("/{appointment_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_appointment(
-    appointment_id: int,
+    appointment_id: str,
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):

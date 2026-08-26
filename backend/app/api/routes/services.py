@@ -40,7 +40,7 @@ def create_service(
 
 @router.patch("/{service_id}", response_model=ServiceOut)
 def update_service(
-    service_id: int,
+    service_id: str,
     payload: ServiceUpdate,
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
@@ -53,7 +53,7 @@ def update_service(
 
 @router.delete("/{service_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_service(
-    service_id: int,
+    service_id: str,
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):

@@ -103,6 +103,11 @@ export default function DocumentList({ reloadSignal = 0 }) {
                       {doc.error_message}
                     </span>
                   )}
+                  {doc.status === "completed" && doc.extraction_summary && (
+                    <span className="data-table__extraction-note" title={doc.extraction_summary}>
+                      {doc.extraction_summary}
+                    </span>
+                  )}
                 </td>
                 <td>
                   <StatusBadge status={doc.status} />

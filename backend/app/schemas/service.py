@@ -19,8 +19,12 @@ class ServiceUpdate(BaseModel):
     duration_minutes: int | None = Field(default=None, gt=0)
 
 
-class ServiceOut(ServiceBase):
-    id: int
+class ServiceOut(BaseModel):
+    id: str
+    name: str
+    description: str | None = None
+    price: float | None = None
+    duration_minutes: int | None = None
 
     model_config = {"from_attributes": True}
 

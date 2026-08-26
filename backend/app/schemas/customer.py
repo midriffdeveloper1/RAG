@@ -7,7 +7,7 @@ class CustomerIdentifyRequest(BaseModel):
 
 
 class CustomerOut(BaseModel):
-    id: int
+    id: str
     email: str
     name: str | None = None
     phone: str | None = None
@@ -15,4 +15,4 @@ class CustomerOut(BaseModel):
 
 class CustomerIdentifyResponse(BaseModel):
     is_returning: bool
-    customer: CustomerOut 
+    customer: CustomerOut

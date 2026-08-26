@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     max_history_exchanges: int = 3
 
     cancellation_window_hours: int = 24
+
+    chat_session_retention_hours: int = 24
     slot_step_minutes: int = 30
     booking_window_days: int = 30
     max_tool_iterations: int = 4

@@ -4,6 +4,7 @@ from sqlalchemy import BigInteger, DateTime, Enum, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from app.core.ids import generate_id
 
 
 class DocumentStatus(str, enum.Enum):
@@ -16,7 +17,7 @@ class DocumentStatus(str, enum.Enum):
 class Document(Base):
     __tablename__ = "documents"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[str] = mapped_column(String(16), primary_key=True, default=generate_id)
 
     original_filename: Mapped[str] = mapped_column(String(500), nullable=False)
     stored_filename: Mapped[str] = mapped_column(String(500), nullable=False)  
@@ -31,7 +32,9 @@ class Document(Base):
     error_message: Mapped[str] = mapped_column(Text, nullable=True)
 
     chunk_count: Mapped[int] = mapped_column(Integer, default=0)
-    version: Mapped[int] = mapped_column(Integer, default=1)  
+    version: Mapped[int] = mapped_column(Integer, default=1)
+
+    extraction_summary: Mapped[str] = mapped_column(Text, nullable=True)
 
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     processed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
