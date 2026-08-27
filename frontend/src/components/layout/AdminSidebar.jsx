@@ -6,6 +6,7 @@ import {
   Building2,
   Calendar,
   FileText,
+  UserCog,
   Users,
   X,
 } from "../common/Icons.jsx";
@@ -15,6 +16,7 @@ const NAV_ITEMS = [
   { to: "/admin/staff", label: "Staff", icon: Users },
   { to: "/admin/services", label: "Services", icon: Briefcase },
   { to: "/admin/appointments", label: "Appointments", icon: Calendar },
+  { to: "/admin/customers", label: "Customers", icon: UserCog },
   { to: "/admin/knowledge-base", label: "Knowledge base", icon: FileText },
   { to: "/admin/business", label: "Business details", icon: Building2 },
   { to: "/admin/chatbot-config", label: "Chatbot configuration", icon: Bot },

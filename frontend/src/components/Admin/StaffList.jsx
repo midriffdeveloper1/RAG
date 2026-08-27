@@ -1,19 +1,17 @@
 import { useCallback, useState } from "react";
 import { useServerPagination } from "../../hooks/useServerPagination.js";
-import { createStaff, deleteStaff, listStaff, updateStaff } from "../../services/adminApi.js";
-import { AlertCircle, Plus, Trash2, Users } from "../common/Icons.jsx";
+import { deleteStaff, listStaff, updateStaff } from "../../services/adminApi.js";
+import { Pencil, Plus, Trash2, Users } from "../common/Icons.jsx";
 import EmptyState from "../common/EmptyState.jsx";
 import Pagination from "../common/Pagination.jsx";
 import { LoadingState, Spinner } from "../common/Spinner.jsx";
+import StaffModal from "./StaffModal.jsx";
 
-const EMPTY_FORM = { name: "", email: "", phone: "", service_ids: [] };
 const PAGE_SIZE = 8;
 
 export default function StaffList({ services = [] }) {
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
-  const [isCreating, setIsCreating] = useState(false);
+  const [modalStaff, setModalStaff] = useState(undefined); // undefined = closed, null = add mode, object = edit mode
 
   const fetcher = useCallback((page, pageSize) => listStaff({ page, pageSize }), []);
 
@@ -27,33 +25,9 @@ export default function StaffList({ services = [] }) {
     startIndex,
     endIndex,
     isLoading,
-    error: loadError,
+    error,
     reload,
   } = useServerPagination(fetcher, { pageSize: PAGE_SIZE });
-
-  function toggleFormService(serviceId) {
-    setForm((prev) => ({
-      ...prev,
-      service_ids: prev.service_ids.includes(serviceId)
-        ? prev.service_ids.filter((id) => id !== serviceId)
-        : [...prev.service_ids, serviceId],
-    }));
-  }
-
-  async function handleCreate(e) {
-    e.preventDefault();
-    setError(null);
-    setIsCreating(true);
-    try {
-      await createStaff(form);
-      setForm(EMPTY_FORM);
-      reload();
-    } catch (err) {
-      setError(err.response?.data?.detail || "Couldn't add the staff member.");
-    } finally {
-      setIsCreating(false);
-    }
-  }
 
   async function toggleActive(member) {
     setBusyId(member.id);
@@ -76,66 +50,45 @@ export default function StaffList({ services = [] }) {
     }
   }
 
+  function handleSaved(saved) {
+    if (modalStaff) {
+      setStaff((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+    } else {
+      reload();
+    }
+  }
+
   return (
     <div className="catalog-section">
-      <form className="catalog-form catalog-form--staff" onSubmit={handleCreate}>
-        <input
-          placeholder="Full name"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          required
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
-        />
-        <input
-          placeholder="Phone"
-          value={form.phone}
-          onChange={(e) => setForm({ ...form, phone: e.target.value })}
-        />
-        <div className="catalog-form__services">
-          {services.map((service) => (
-            <label key={service.id} className="catalog-form__service-chip">
-              <input
-                type="checkbox"
-                checked={form.service_ids.includes(service.id)}
-                onChange={() => toggleFormService(service.id)}
-              />
-              {service.name}
-            </label>
-          ))}
-        </div>
-        <button type="submit" disabled={isCreating}>
-          {isCreating ? <Spinner size={14} className="spinner--on-dark" /> : <Plus size={14} />}
-          Add staff member
+      <div className="catalog-section__toolbar">
+        <button type="button" className="catalog-section__add-btn" onClick={() => setModalStaff(null)}>
+          <Plus size={15} />
+          Add staff
         </button>
-      </form>
-
-      {error && (
-        <p className="admin-dashboard__error">
-          <AlertCircle size={14} />
-          {error}
-        </p>
-      )}
+      </div>
 
       {isLoading && <LoadingState label="Loading staff…" />}
-      {loadError && <p className="admin-dashboard__error">{loadError}</p>}
+      {error && <p className="admin-dashboard__error">{error}</p>}
 
-      {!isLoading && !loadError && total === 0 && (
+      {!isLoading && !error && total === 0 && (
         <EmptyState
           icon={Users}
           title="No staff added yet"
-          description="Add a staff member using the form above."
+          description="Click “Add staff” to add your first team member."
         />
       )}
 
-      {!isLoading && !loadError && total > 0 && (
+      {!isLoading && !error && total > 0 && (
         <>
           <div className="data-table-wrapper">
             <table className="data-table">
+              <colgroup>
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "38%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "20%" }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Name</th>
@@ -160,6 +113,16 @@ export default function StaffList({ services = [] }) {
                       </span>
                     </td>
                     <td className="data-table__actions">
+                      <button
+                        type="button"
+                        className="icon-button"
+                        disabled={busyId === member.id}
+                        onClick={() => setModalStaff(member)}
+                        aria-label="Edit staff member"
+                        title="Edit"
+                      >
+                        <Pencil size={14} />
+                      </button>
                       <button
                         type="button"
                         className="pill-button"
@@ -196,6 +159,15 @@ export default function StaffList({ services = [] }) {
             itemLabel="staff members"
           />
         </>
+      )}
+
+      {modalStaff !== undefined && (
+        <StaffModal
+          staff={modalStaff}
+          services={services}
+          onClose={() => setModalStaff(undefined)}
+          onSaved={handleSaved}
+        />
       )}
     </div>
   );

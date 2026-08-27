@@ -40,7 +40,19 @@ class AppointmentListResponse(BaseModel):
     total_pages: int = 1
 
 
+class AdminAppointmentCreate(BaseModel):
+    service_id: str
+    staff_id: str
+    customer_name: str
+    customer_email: str
+    customer_phone: str
+    appointment_date: date
+    start_time: time
+    notes: str | None = None
+
+
 class AdminAppointmentUpdate(BaseModel):
+    service_id: str | None = None
     appointment_date: date | None = None
     start_time: time | None = None
     staff_id: str | None = None

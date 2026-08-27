@@ -11,7 +11,7 @@ from app.core.config import get_settings
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.knowledge_base import Business, OpeningHour, Service
 from app.models.staff import Staff
-from app.schemas.appointment import AdminAppointmentUpdate, AppointmentOut
+from app.schemas.appointment import AdminAppointmentCreate, AdminAppointmentUpdate, AppointmentOut
 from app.services.time_utils import day_name, is_valid_email, is_valid_phone, parse_date, parse_time
 
 settings = get_settings()
@@ -288,6 +288,7 @@ class AppointmentService:
         except ValueError as exc:
             return {"error": str(exc)}
 
+        
         existing = (
             self.db.query(Appointment)
             .filter(
@@ -581,15 +582,27 @@ class AppointmentService:
         if appointment is None:
             raise ValueError("Appointment not found.")
 
+        if payload.service_id is not None:
+            service = self.db.query(Service).filter(Service.id == payload.service_id).first()
+            if service is None:
+                raise ValueError("Service not found.")
+            appointment.service_id = service.id
         if payload.staff_id is not None:
             appointment.staff_id = payload.staff_id
         if payload.appointment_date is not None:
             appointment.appointment_date = payload.appointment_date
         if payload.start_time is not None:
             appointment.start_time = payload.start_time
+        if payload.start_time is not None or payload.service_id is not None:
+            duration = appointment.service.duration_minutes
+            if duration is None:
+                raise ValueError(
+                    f"{appointment.service.name} doesn't have a duration set yet — "
+                    "add one on the Services page first."
+                )
             appointment.end_time = (
-                datetime.combine(appointment.appointment_date, payload.start_time)
-                + timedelta(minutes=appointment.service.duration_minutes)
+                datetime.combine(appointment.appointment_date, appointment.start_time)
+                + timedelta(minutes=duration)
             ).time()
         if payload.status is not None:
             appointment.status = payload.status
@@ -604,6 +617,59 @@ class AppointmentService:
         if payload.customer_phone is not None:
             appointment.customer_phone = payload.customer_phone
 
+        self.db.commit()
+        self.db.refresh(appointment)
+        return appointment
+
+    def admin_create(self, payload: AdminAppointmentCreate) -> Appointment:
+        service = self.db.query(Service).filter(Service.id == payload.service_id).first()
+        if service is None:
+            raise ValueError("Service not found.")
+        if service.duration_minutes is None:
+            raise ValueError(
+                f"{service.name} doesn't have a duration set yet — add one on the Services page first."
+            )
+        staff = self.db.query(Staff).filter(Staff.id == payload.staff_id).first()
+        if staff is None:
+            raise ValueError("Staff member not found.")
+        if not is_valid_email(payload.customer_email):
+            raise ValueError("That email address doesn't look valid.")
+        if not is_valid_phone(payload.customer_phone):
+            raise ValueError("That phone number doesn't look valid.")
+
+        end_time = (
+            datetime.combine(payload.appointment_date, payload.start_time)
+            + timedelta(minutes=service.duration_minutes)
+        ).time()
+
+        conflict = (
+            self.db.query(Appointment)
+            .filter(
+                Appointment.staff_id == staff.id,
+                Appointment.appointment_date == payload.appointment_date,
+                Appointment.status == AppointmentStatus.BOOKED,
+                Appointment.start_time < end_time,
+                Appointment.end_time > payload.start_time,
+            )
+            .first()
+        )
+        if conflict is not None:
+            raise ValueError(f"{staff.name} already has an overlapping appointment at that time.")
+
+        appointment = Appointment(
+            reference_code=self._generate_unique_reference_code(),
+            service_id=service.id,
+            staff_id=staff.id,
+            customer_name=payload.customer_name.strip(),
+            customer_email=payload.customer_email.strip().lower(),
+            customer_phone=payload.customer_phone.strip(),
+            appointment_date=payload.appointment_date,
+            start_time=payload.start_time,
+            end_time=end_time,
+            status=AppointmentStatus.BOOKED,
+            notes=payload.notes,
+        )
+        self.db.add(appointment)
         self.db.commit()
         self.db.refresh(appointment)
         return appointment

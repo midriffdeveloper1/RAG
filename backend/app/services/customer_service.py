@@ -1,3 +1,4 @@
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models.chat_session import ChatSession
@@ -15,8 +16,6 @@ def _serialize(customer: Customer) -> dict:
 
 
 class CustomerService:
-    """Long-term memory for the chatbot: one profile per email, independent of
-    any single browser or chat session (short-term memory)."""
 
     def __init__(self, db: Session) -> None:
         self.db = db
@@ -102,11 +101,81 @@ class CustomerService:
             return result
         customer = result
 
-        # Unlink (never cascade-delete) — appointment records and their own
-        # customer_name/email/phone snapshot are kept intentionally.
         self.db.query(ChatSession).filter(ChatSession.customer_id == customer.id).update(
             {ChatSession.customer_id: None}, synchronize_session=False
         )
         self.db.delete(customer)
         self.db.commit()
         return {"status": "deleted"}
+
+    
+
+    def admin_list_paginated(
+        self, page: int = 1, page_size: int = 10, search: str | None = None
+    ) -> tuple[list[Customer], int]:
+        query = self.db.query(Customer)
+        if search:
+            like = f"%{search.strip().lower()}%"
+            query = query.filter(
+                or_(func.lower(Customer.email).like(like), func.lower(Customer.name).like(like))
+            )
+        query = query.order_by(Customer.created_at.desc())
+        total = query.count()
+        items = query.offset((page - 1) * page_size).limit(page_size).all()
+        return items, total
+
+    def admin_create(self, email: str, name: str | None = None, phone: str | None = None) -> Customer:
+        if not is_valid_email(email):
+            raise ValueError("That email address doesn't look valid.")
+        normalized = self._normalize_email(email)
+        if self.get_by_email(normalized) is not None:
+            raise ValueError("A customer with that email already exists.")
+        if phone and not is_valid_phone(phone):
+            raise ValueError("That phone number doesn't look valid.")
+
+        customer = Customer(email=normalized, name=(name or None), phone=(phone or None))
+        self.db.add(customer)
+        self.db.commit()
+        self.db.refresh(customer)
+        return customer
+
+    def admin_update(
+        self,
+        customer_id: str,
+        email: str | None = None,
+        name: str | None = None,
+        phone: str | None = None,
+    ) -> Customer:
+        customer = self.db.query(Customer).filter(Customer.id == customer_id).first()
+        if customer is None:
+            raise LookupError("Customer not found.")
+
+        if email is not None:
+            if not is_valid_email(email):
+                raise ValueError("That email address doesn't look valid.")
+            normalized = self._normalize_email(email)
+            existing = self.get_by_email(normalized)
+            if existing is not None and existing.id != customer.id:
+                raise ValueError("Another customer already uses that email.")
+            customer.email = normalized
+        if name is not None:
+            customer.name = name.strip() or None
+        if phone is not None:
+            if phone and not is_valid_phone(phone):
+                raise ValueError("That phone number doesn't look valid.")
+            customer.phone = phone.strip() or None
+
+        self.db.commit()
+        self.db.refresh(customer)
+        return customer
+
+    def admin_delete(self, customer_id: str) -> bool:
+        customer = self.db.query(Customer).filter(Customer.id == customer_id).first()
+        if customer is None:
+            return False
+        self.db.query(ChatSession).filter(ChatSession.customer_id == customer.id).update(
+            {ChatSession.customer_id: None}, synchronize_session=False
+        )
+        self.db.delete(customer)
+        self.db.commit()
+        return True

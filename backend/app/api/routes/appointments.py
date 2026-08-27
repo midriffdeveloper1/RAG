@@ -1,13 +1,20 @@
+import math
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_admin
+from app.api.deps import get_current_admin, get_page_params
 from app.core.database import get_db
 from app.models.admin import Admin
 from app.models.appointment import AppointmentStatus
-from app.schemas.appointment import AdminAppointmentUpdate, AppointmentListResponse, AppointmentOut
+from app.schemas.appointment import (
+    AdminAppointmentCreate,
+    AdminAppointmentUpdate,
+    AppointmentListResponse,
+    AppointmentOut,
+)
+from app.schemas.common import PageParams
 from app.services.appointment_service import AppointmentService, to_appointment_out
 
 router = APIRouter(prefix="/admin/appointments", tags=["Admin Appointments"])
@@ -20,10 +27,13 @@ def list_appointments(
     customer_email: str | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
+    params: PageParams = Depends(get_page_params),
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):
-    appointments = AppointmentService(db).admin_list(
+    appointments, total = AppointmentService(db).admin_list_paginated(
+        page=params.page,
+        page_size=params.page_size,
         status=status_filter,
         staff_id=staff_id,
         customer_email=customer_email,
@@ -31,8 +41,25 @@ def list_appointments(
         date_to=date_to,
     )
     return AppointmentListResponse(
-        appointments=[to_appointment_out(a) for a in appointments], total=len(appointments)
+        appointments=[to_appointment_out(a) for a in appointments],
+        total=total,
+        page=params.page,
+        page_size=params.page_size,
+        total_pages=max(1, math.ceil(total / params.page_size)),
     )
+
+
+@router.post("", response_model=AppointmentOut, status_code=status.HTTP_201_CREATED)
+def create_appointment(
+    payload: AdminAppointmentCreate,
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin),
+):
+    try:
+        appointment = AppointmentService(db).admin_create(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return to_appointment_out(appointment)
 
 
 @router.get("/{appointment_id}", response_model=AppointmentOut)
@@ -57,7 +84,9 @@ def update_appointment(
     try:
         appointment = AppointmentService(db).admin_update(appointment_id, payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+        if str(exc) == "Appointment not found.":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return to_appointment_out(appointment)
 
 

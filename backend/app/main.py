@@ -57,6 +57,7 @@ app.include_router(analytics.router, prefix=settings.api_v1_prefix)
 app.include_router(chat.router, prefix=settings.api_v1_prefix)
 app.include_router(chat_sessions.router, prefix=settings.api_v1_prefix)
 app.include_router(customers.router, prefix=settings.api_v1_prefix)
+app.include_router(customers.admin_router, prefix=settings.api_v1_prefix)
 
 @app.get("/")
 def root():

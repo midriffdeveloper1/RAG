@@ -1,18 +1,20 @@
 import { useCallback, useState } from "react";
 import { useServerPagination } from "../../hooks/useServerPagination.js";
-import { deleteAppointment, listAppointments, updateAppointment } from "../../services/adminApi.js";
-import { Calendar, Trash2 } from "../common/Icons.jsx";
+import { deleteAppointment, listAppointments } from "../../services/adminApi.js";
+import { Calendar, Pencil, Plus, Trash2 } from "../common/Icons.jsx";
 import EmptyState from "../common/EmptyState.jsx";
 import Pagination from "../common/Pagination.jsx";
 import { LoadingState, Spinner } from "../common/Spinner.jsx";
+import AppointmentModal from "./AppointmentModal.jsx";
 import StatusBadge from "./StatusBadge.jsx";
 
 const STATUS_OPTIONS = ["booked", "cancelled", "completed"];
 const PAGE_SIZE = 8;
 
-export default function AppointmentList() {
+export default function AppointmentList({ services = [], staff = [] }) {
   const [statusFilter, setStatusFilter] = useState("");
   const [busyId, setBusyId] = useState(null);
+  const [modalAppointment, setModalAppointment] = useState(undefined); // undefined = closed, null = add, object = edit
 
   const fetcher = useCallback(
     (page, pageSize) =>
@@ -24,7 +26,6 @@ export default function AppointmentList() {
     page,
     setPage,
     items: appointments,
-    setItems: setAppointments,
     total,
     totalPages,
     startIndex,
@@ -33,16 +34,6 @@ export default function AppointmentList() {
     error,
     reload,
   } = useServerPagination(fetcher, { pageSize: PAGE_SIZE, deps: [statusFilter] });
-
-  async function handleStatusChange(appointment, status) {
-    setBusyId(appointment.id);
-    try {
-      const updated = await updateAppointment(appointment.id, { status });
-      setAppointments((prev) => prev.map((a) => (a.id === appointment.id ? updated : a)));
-    } finally {
-      setBusyId(null);
-    }
-  }
 
   async function handleDelete(id) {
     if (!window.confirm("Permanently delete this appointment record?")) return;
@@ -57,18 +48,28 @@ export default function AppointmentList() {
 
   return (
     <div className="catalog-section">
-      <div className="appointment-filters">
-        <label>
-          Status
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="">All</option>
-            {STATUS_OPTIONS.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="catalog-section__toolbar catalog-section__toolbar--split">
+        <div className="appointment-filters">
+          <label>
+            Status
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="">All</option>
+              {STATUS_OPTIONS.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <button
+          type="button"
+          className="catalog-section__add-btn"
+          onClick={() => setModalAppointment(null)}
+        >
+          <Plus size={15} />
+          Add appointment
+        </button>
       </div>
 
       {isLoading && <LoadingState label="Loading appointments…" />}
@@ -78,7 +79,7 @@ export default function AppointmentList() {
         <EmptyState
           icon={Calendar}
           title="No appointments found"
-          description="Bookings made through the chat assistant will show up here."
+          description="Bookings made through the chat assistant show up here, or add one manually."
         />
       )}
 
@@ -86,6 +87,14 @@ export default function AppointmentList() {
         <>
           <div className="data-table-wrapper">
             <table className="data-table">
+              <colgroup>
+                <col style={{ width: "22%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "22%" }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Customer</th>
@@ -113,17 +122,16 @@ export default function AppointmentList() {
                       <StatusBadge status={appt.status} />
                     </td>
                     <td className="data-table__actions">
-                      <select
-                        value={appt.status}
+                      <button
+                        type="button"
+                        className="icon-button"
                         disabled={busyId === appt.id}
-                        onChange={(e) => handleStatusChange(appt, e.target.value)}
+                        onClick={() => setModalAppointment(appt)}
+                        aria-label="Edit appointment"
+                        title="Edit"
                       >
-                        {STATUS_OPTIONS.map((status) => (
-                          <option key={status} value={status}>
-                            {status}
-                          </option>
-                        ))}
-                      </select>
+                        <Pencil size={14} />
+                      </button>
                       <button
                         type="button"
                         className="icon-button icon-button--danger"
@@ -151,6 +159,16 @@ export default function AppointmentList() {
             itemLabel="appointments"
           />
         </>
+      )}
+
+      {modalAppointment !== undefined && (
+        <AppointmentModal
+          appointment={modalAppointment}
+          services={services}
+          staff={staff}
+          onClose={() => setModalAppointment(undefined)}
+          onSaved={reload}
+        />
       )}
     </div>
   );

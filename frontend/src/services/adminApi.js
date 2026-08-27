@@ -70,11 +70,17 @@ export async function deleteService(serviceId) {
   await apiClient.delete(`/admin/services/${serviceId}`);
 }
 
+// Staff (backend-paginated)
 export async function listStaff({ page = 1, pageSize = 8 } = {}) {
   const { data } = await apiClient.get("/admin/staff", {
     params: { page, page_size: pageSize },
   });
   return data;
+}
+
+export async function listAllStaff() {
+  const { data } = await apiClient.get("/admin/staff", { params: { page: 1, page_size: 100 } });
+  return data.items;
 }
 
 export async function createStaff(payload) {
@@ -106,6 +112,11 @@ export async function listAppointments({ page = 1, pageSize = 8, filters = {} } 
 
 export async function updateAppointment(appointmentId, payload) {
   const { data } = await apiClient.patch(`/admin/appointments/${appointmentId}`, payload);
+  return data;
+}
+
+export async function createAppointment(payload) {
+  const { data } = await apiClient.post("/admin/appointments", payload);
   return data;
 }
 
@@ -179,4 +190,25 @@ export async function previewSystemPrompt() {
 export async function getAnalyticsOverview() {
   const { data } = await apiClient.get("/admin/analytics/overview");
   return data;
+}
+
+export async function listCustomers({ page = 1, pageSize = 8, search = "" } = {}) {
+  const { data } = await apiClient.get("/admin/customers", {
+    params: { page, page_size: pageSize, search: search || undefined },
+  });
+  return data;
+}
+
+export async function createCustomer(payload) {
+  const { data } = await apiClient.post("/admin/customers", payload);
+  return data;
+}
+
+export async function updateCustomer(customerId, payload) {
+  const { data } = await apiClient.patch(`/admin/customers/${customerId}`, payload);
+  return data;
+}
+
+export async function deleteCustomer(customerId) {
+  await apiClient.delete(`/admin/customers/${customerId}`);
 }

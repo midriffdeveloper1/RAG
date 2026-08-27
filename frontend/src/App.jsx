@@ -7,6 +7,7 @@ import AdminLogin from "./pages/AdminLogin.jsx";
 import AdminAppointmentsPage from "./pages/admin/AdminAppointmentsPage.jsx";
 import AdminBusinessPage from "./pages/admin/AdminBusinessPage.jsx";
 import AdminChatbotConfigPage from "./pages/admin/AdminChatbotConfigPage.jsx";
+import AdminCustomersPage from "./pages/admin/AdminCustomersPage.jsx";
 import AdminKnowledgeBasePage from "./pages/admin/AdminKnowledgeBasePage.jsx";
 import AdminOverview from "./pages/admin/AdminOverview.jsx";
 import AdminServicesPage from "./pages/admin/AdminServicesPage.jsx";
@@ -15,10 +16,6 @@ import Home from "./pages/Home.jsx";
 
 export default function App() {
   const location = useLocation();
-  // The admin section (including its login screen) has its own header/topbar
-  // and its own logout control — rendering the public site chrome on top of
-  // it produced the stacked double-navbar look. Every /admin/* route manages
-  // its own chrome instead.
   const isAdminRoute = location.pathname.startsWith("/admin");
 
   return (
@@ -42,6 +39,7 @@ export default function App() {
             <Route path="staff" element={<AdminStaffPage />} />
             <Route path="services" element={<AdminServicesPage />} />
             <Route path="appointments" element={<AdminAppointmentsPage />} />
+            <Route path="customers" element={<AdminCustomersPage />} />
             <Route path="knowledge-base" element={<AdminKnowledgeBasePage />} />
             <Route path="business" element={<AdminBusinessPage />} />
             <Route path="chatbot-config" element={<AdminChatbotConfigPage />} />

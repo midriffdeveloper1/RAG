@@ -842,6 +842,7 @@ body {
 /* --- Admin: generic data table (services, staff, appointments) --- */
 .data-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -864,6 +865,7 @@ body {
   padding: 12px 16px;
   border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
+  overflow-wrap: break-word;
 }
 
 .data-table tr:last-child td {
@@ -1013,8 +1015,8 @@ body {
 .data-table__actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-  white-space: nowrap;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 /* --- Admin: icon / pill buttons (used across all admin tables) --- */
@@ -1790,80 +1792,6 @@ body {
 .admin-mini-stats__card--cancelled { color: #b3413a; }
 .admin-mini-stats__card--booked { color: var(--color-accent); }
 
-.faq-policy-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 0 0 16px;
-  padding: 0;
-}
-
-.faq-policy-item {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 10px;
-  align-items: start;
-  padding: 12px;
-  border-radius: var(--radius-sm);
-  background: var(--color-bg);
-}
-
-.faq-policy-item__title-input {
-  font-weight: 700;
-}
-
-.faq-policy-item input,
-.faq-policy-item textarea {
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  font-family: var(--font-body);
-  font-size: 12.5px;
-  color: var(--color-text);
-  resize: vertical;
-}
-
-.faq-policy-add-form {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 10px;
-  align-items: start;
-}
-
-.faq-policy-add-form input,
-.faq-policy-add-form textarea {
-  padding: 9px 11px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
-  font-family: var(--font-body);
-  font-size: 13px;
-}
-
-.faq-policy-add-form button {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 14px;
-  height: fit-content;
-  border-radius: var(--radius-sm);
-  border: none;
-  background: var(--color-primary);
-  color: #fff;
-  font-weight: 700;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-@media (max-width: 720px) {
-  .faq-policy-item,
-  .faq-policy-add-form {
-    grid-template-columns: 1fr;
-  }
-}
-
 /* --- Settings forms (Business details / Chatbot configuration) --- */
 .settings-form {
   display: flex;
@@ -1977,47 +1905,6 @@ body {
   color: #1f7a44;
   font-size: 13px;
   margin: 0;
-}
-
-.settings-form__hint {
-  font-size: 12.5px;
-  color: var(--color-text-muted);
-  margin: 0 0 12px;
-}
-
-.settings-form__preview-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 16px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
-  font-family: var(--font-body);
-  font-weight: 700;
-  font-size: 12.5px;
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-.settings-form__preview-btn:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
-
-.settings-form__prompt-preview {
-  margin-top: 14px;
-  padding: 16px;
-  border-radius: var(--radius-sm);
-  background: #1c1a16;
-  color: #e8e3d8;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 11.5px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-height: 480px;
-  overflow-y: auto;
 }
 
 /* --- Opening hours grid --- */
@@ -2181,4 +2068,340 @@ body {
     grid-template-columns: 90px 1fr;
     row-gap: 6px;
   }
+}
+
+/* --- Chatbot config: compiled prompt preview --- */
+.settings-form__hint {
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+  margin: 0 0 12px;
+}
+
+.settings-form__preview-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.settings-form__preview-btn:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.settings-form__prompt-preview {
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  background: #1c1a16;
+  color: #e8e3d8;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+/* --- FAQ / Policy manager (Business Details page) --- */
+.faq-policy-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 0;
+}
+
+.faq-policy-item {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+}
+
+.faq-policy-item__title-input {
+  font-weight: 700;
+}
+
+.faq-policy-item input,
+.faq-policy-item textarea {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  color: var(--color-text);
+  resize: vertical;
+}
+
+.faq-policy-add-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.faq-policy-add-form input,
+.faq-policy-add-form textarea {
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+
+.faq-policy-add-form button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  height: fit-content;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .faq-policy-item,
+  .faq-policy-add-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Catalog section toolbar (Add staff/service button) --- */
+.catalog-section__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+}
+
+.catalog-section__toolbar--split {
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.customer-search-input {
+  flex: 1;
+  max-width: 320px;
+  padding: 9px 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.customer-search-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.catalog-section__add-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--color-primary);
+  color: #fff;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.catalog-section__add-btn:hover {
+  background: var(--color-primary-dark);
+}
+
+/* --- Generic modal overlay --- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 18, 14, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 100;
+}
+
+.modal-card {
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.modal-card__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  background: var(--color-surface);
+}
+
+.modal-card__header h2 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  color: var(--color-primary-dark);
+  margin: 0;
+  flex: 1;
+}
+
+.modal-card__close {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.modal-card__close:hover {
+  color: var(--color-accent);
+}
+
+.modal-card__body {
+  padding: 20px;
+}
+
+/* --- Staff add/edit modal form --- */
+.staff-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.staff-modal-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.staff-modal-form__cancel {
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: none;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.staff-modal-form__cancel:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+/* --- Multi-select dropdown (services picker) --- */
+.multiselect {
+  position: relative;
+}
+
+.multiselect__trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.multiselect__trigger:hover {
+  border-color: var(--color-accent);
+}
+
+.multiselect__placeholder {
+  color: var(--color-text-muted);
+}
+
+.multiselect__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15);
+  z-index: 20;
+  padding: 6px;
+}
+
+.multiselect__option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.multiselect__option:hover {
+  background: var(--color-bg);
+}
+
+.multiselect__checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 4px;
+  border: 1.5px solid var(--color-border);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.multiselect__checkbox--checked {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.multiselect__empty {
+  padding: 10px;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+  margin: 0;
 }
