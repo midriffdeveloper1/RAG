@@ -83,11 +83,11 @@ export default function StaffList({ services = [] }) {
           <div className="data-table-wrapper">
             <table className="data-table">
               <colgroup>
-                <col style={{ width: "16%" }} />
-                <col style={{ width: "16%" }} />
+                <col style={{ width: "17%" }} />
+                <col style={{ width: "20%" }} />
                 <col style={{ width: "38%" }} />
                 <col style={{ width: "10%" }} />
-                <col style={{ width: "20%" }} />
+                <col style={{ width: "15%" }} />
               </colgroup>
               <thead>
                 <tr>

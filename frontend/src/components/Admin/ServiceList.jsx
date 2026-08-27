@@ -63,11 +63,11 @@ export default function ServiceList() {
           <div className="data-table-wrapper">
             <table className="data-table">
               <colgroup>
-                <col style={{ width: "22%" }} />
-                <col style={{ width: "38%" }} />
-                <col style={{ width: "15%" }} />
-                <col style={{ width: "15%" }} />
-                <col style={{ width: "10%" }} />
+                <col style={{ width: "20%" }} />
+                <col style={{ width: "40%" }} />
+                <col style={{ width: "13%" }} />
+                <col style={{ width: "13%" }} />
+                <col style={{ width: "14%" }} />
               </colgroup>
               <thead>
                 <tr>

@@ -79,6 +79,15 @@ export default function DocumentList({ reloadSignal = 0 }) {
     <>
       <div className="data-table-wrapper">
         <table className="data-table">
+          <colgroup>
+            <col style={{ width: "28%" }} />
+            <col style={{ width: "13%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "11%" }} />
+            <col style={{ width: "18%" }} />
+            <col style={{ width: "10%" }} />
+          </colgroup>
           <thead>
             <tr>
               <th>File</th>
