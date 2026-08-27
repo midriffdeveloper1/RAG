@@ -16,9 +16,6 @@ from app.services.time_utils import day_name, is_valid_email, is_valid_phone, pa
 
 settings = get_settings()
 
-# Unambiguous alphabet (no 0/O/1/I/L) so a spoken/typed reference code can't be
-# misread, and random enough (32^8 combinations) that it can't be brute-forced
-# or guessed the way a sequential integer ID could be.
 _REFERENCE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 _REFERENCE_LENGTH = 8
 
@@ -290,6 +287,30 @@ class AppointmentService:
             start_time = parse_time(start_time_str)
         except ValueError as exc:
             return {"error": str(exc)}
+
+        existing = (
+            self.db.query(Appointment)
+            .filter(
+                Appointment.service_id == service.id,
+                Appointment.customer_email == customer_email.strip().lower(),
+                Appointment.appointment_date == target_date,
+                Appointment.start_time == start_time,
+                Appointment.status == AppointmentStatus.BOOKED,
+            )
+            .first()
+        )
+        if existing is not None:
+            staff = self.db.query(Staff).filter(Staff.id == existing.staff_id).first()
+            return {
+                "appointment_id": existing.reference_code,
+                "service": service.name,
+                "staff": staff.name if staff else None,
+                "date": str(existing.appointment_date),
+                "start_time": existing.start_time.strftime("%H:%M"),
+                "end_time": existing.end_time.strftime("%H:%M"),
+                "status": "booked",
+                "already_booked": True,
+            }
 
         window_error = self._validate_window(target_date)
         if window_error:

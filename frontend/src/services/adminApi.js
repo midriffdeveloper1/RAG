@@ -123,6 +123,44 @@ export async function updateBusiness(payload) {
   return data;
 }
 
+export async function listFaqs() {
+  const { data } = await apiClient.get("/admin/business/faqs");
+  return data;
+}
+
+export async function createFaq(payload) {
+  const { data } = await apiClient.post("/admin/business/faqs", payload);
+  return data;
+}
+
+export async function updateFaq(faqId, payload) {
+  const { data } = await apiClient.patch(`/admin/business/faqs/${faqId}`, payload);
+  return data;
+}
+
+export async function deleteFaq(faqId) {
+  await apiClient.delete(`/admin/business/faqs/${faqId}`);
+}
+
+export async function listPolicies() {
+  const { data } = await apiClient.get("/admin/business/policies");
+  return data;
+}
+
+export async function createPolicy(payload) {
+  const { data } = await apiClient.post("/admin/business/policies", payload);
+  return data;
+}
+
+export async function updatePolicy(policyId, payload) {
+  const { data } = await apiClient.patch(`/admin/business/policies/${policyId}`, payload);
+  return data;
+}
+
+export async function deletePolicy(policyId) {
+  await apiClient.delete(`/admin/business/policies/${policyId}`);
+}
+
 export async function getChatbotConfig() {
   const { data } = await apiClient.get("/admin/chatbot-config");
   return data;
@@ -131,6 +169,11 @@ export async function getChatbotConfig() {
 export async function updateChatbotConfig(payload) {
   const { data } = await apiClient.put("/admin/chatbot-config", payload);
   return data;
+}
+
+export async function previewSystemPrompt() {
+  const { data } = await apiClient.get("/admin/chatbot-config/preview-prompt");
+  return data.prompt;
 }
 
 export async function getAnalyticsOverview() {

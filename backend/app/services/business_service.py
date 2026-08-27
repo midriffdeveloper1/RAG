@@ -8,8 +8,14 @@ class BusinessService:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def get(self) -> Business | None:
-        return self.db.query(Business).first()
+    def get(self) -> Business:
+        business = self.db.query(Business).first()
+        if business is None:
+            business = Business(name="My Business")
+            self.db.add(business)
+            self.db.commit()
+            self.db.refresh(business)
+        return business
 
     def update(self, payload: BusinessUpdate) -> Business:
         business = self.get()

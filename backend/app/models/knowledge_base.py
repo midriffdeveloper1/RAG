@@ -18,6 +18,7 @@ class Business(Base):
 
     services: Mapped[list["Service"]] = relationship(back_populates="business")
     faqs: Mapped[list["FAQ"]] = relationship(back_populates="business")
+    policies: Mapped[list["Policy"]] = relationship(back_populates="business")
     opening_hours: Mapped[list["OpeningHour"]] = relationship(back_populates="business")
 
 
@@ -71,3 +72,5 @@ class Policy(Base):
     business_id: Mapped[int] = mapped_column(ForeignKey("business.id"))
     title: Mapped[str] = mapped_column(String(255), nullable=False)  
     content: Mapped[str] = mapped_column(Text, nullable=False)
+
+    business: Mapped["Business"] = relationship(back_populates="policies")

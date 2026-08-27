@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
 
+from app.schemas.faq_policy import FAQOut, PolicyOut
+
 
 class OpeningHourOut(BaseModel):
     id: int
@@ -26,6 +28,8 @@ class BusinessOut(BaseModel):
     phone: str | None = None
     email: str | None = None
     opening_hours: list[OpeningHourOut] = []
+    faqs: list[FAQOut] = []
+    policies: list[PolicyOut] = []
 
     model_config = {"from_attributes": True}
 

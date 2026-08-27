@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getChatbotConfig, updateChatbotConfig } from "../../services/adminApi.js";
+import { getChatbotConfig, previewSystemPrompt, updateChatbotConfig } from "../../services/adminApi.js";
 import { AlertCircle, CheckCircle2, Plus, Trash2 } from "../common/Icons.jsx";
 import { LoadingState, Spinner } from "../common/Spinner.jsx";
 
@@ -12,6 +12,9 @@ export default function ChatbotConfigForm() {
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
   const [newQuestion, setNewQuestion] = useState("");
+  const [promptPreview, setPromptPreview] = useState(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState(null);
 
   useEffect(() => {
     getChatbotConfig()
@@ -47,10 +50,24 @@ export default function ChatbotConfigForm() {
       const updated = await updateChatbotConfig(form);
       setForm(updated);
       setSaved(true);
+      setPromptPreview(null); // stale now that settings changed — reload on next "Preview" click
     } catch (err) {
       setError(err.response?.data?.detail || "Couldn't save chatbot configuration.");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handlePreview() {
+    setIsPreviewLoading(true);
+    setPreviewError(null);
+    try {
+      const prompt = await previewSystemPrompt();
+      setPromptPreview(prompt);
+    } catch (err) {
+      setPreviewError(err.response?.data?.detail || "Couldn't generate a preview.");
+    } finally {
+      setIsPreviewLoading(false);
     }
   }
 
@@ -209,6 +226,31 @@ export default function ChatbotConfigForm() {
             Add
           </button>
         </div>
+      </div>
+
+      <div className="settings-form__section">
+        <h2>Preview compiled prompt</h2>
+        <p className="settings-form__hint">
+          See exactly what gets sent to the chatbot right now — each section is labeled with
+          which admin page controls it, so it's clear where tone, business info, and the
+          fallback message actually come from.
+        </p>
+        <button
+          type="button"
+          className="settings-form__preview-btn"
+          onClick={handlePreview}
+          disabled={isPreviewLoading}
+        >
+          {isPreviewLoading && <Spinner size={14} />}
+          {isPreviewLoading ? "Compiling…" : "Preview prompt"}
+        </button>
+        {previewError && (
+          <p className="admin-dashboard__error">
+            <AlertCircle size={14} />
+            {previewError}
+          </p>
+        )}
+        {promptPreview && <pre className="settings-form__prompt-preview">{promptPreview}</pre>}
       </div>
 
       {error && (

@@ -1,4 +1,5 @@
 import BusinessForm from "../../components/Admin/BusinessForm.jsx";
+import FaqPolicyManager from "../../components/Admin/FaqPolicyManager.jsx";
 
 export default function AdminBusinessPage() {
   return (
@@ -10,6 +11,7 @@ export default function AdminBusinessPage() {
         </div>
       </div>
       <BusinessForm />
+      <FaqPolicyManager />
     </div>
   );
 }

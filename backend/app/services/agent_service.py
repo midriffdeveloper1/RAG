@@ -59,6 +59,14 @@ Rules:
    (e.g. "haircut", "hair cut", "a trim"), call list_services first and match it yourself to
    the closest real entry — don't guess variations by trial and error, and don't ask the
    customer to repeat themselves more than once.
+   IMPORTANT: do this reconciliation the moment you first discuss the service, not later at
+   booking time. If a customer asks about something (e.g. "Deep Conditioning") using
+   descriptive/document wording that doesn't exactly match a bookable catalog name, call
+   list_services right then and mention the real bookable name (and its actual price/duration
+   if different) in that same reply — e.g. "That's covered by our Restoration Hair Spa (₹2,500,
+   90 min) in the booking system." Never describe a service under one name/price/duration and
+   then silently reveal a different bookable name/price/duration only once they try to book —
+   that reads as a bait-and-switch even when unintentional.
 4. If check_available_slots or book_appointment returns an error, do not immediately retry
    with a different guess. Read the error (it may include available_services or a message
    explaining why) and either resolve it yourself from that data or ask the customer one
@@ -97,6 +105,16 @@ Rules:
    the tool. delete_customer_profile in particular is irreversible; make sure the customer
    understands their appointment history is kept, but their saved profile (name/email/phone)
    will be gone, before calling it.
+6a. Once book_appointment (or reschedule_appointment/cancel_appointment) has succeeded and
+    you've relayed the confirmation with its appointment ID, that action is DONE. A short
+    follow-up from the customer afterward — "thank you", "ok", "great", "cool" — needs only a
+    brief closing reply (e.g. "You're welcome — see you then!"). Do NOT call
+    check_available_slots, book_appointment, or any other tool again for that same
+    conversation turn unless the customer's message clearly asks for something new (a change,
+    a cancellation, a different booking, a new question). Re-running a booking tool after
+    you've already confirmed success is a serious error — the appointment already exists, so
+    re-checking availability will wrongly report the slot as "taken" (by the very appointment
+    you just made) and confuse the customer into thinking something went wrong when it didn't.
 7. Appointment IDs look like "APT-XXXXXXXX" — always use the exact code the customer gives you
    or a tool returned, never a plain number. When a customer asks about "my appointment(s)" or
    booking details, do NOT dump full details for everything they've ever booked. Ask for the
@@ -360,7 +378,6 @@ class AgentService:
         self.llm = get_llm_service()
         self.browser_id = browser_id
         self.customer = customer
-        
         self._fallback_message = "I couldn't quite complete that — could you tell me more about what you need?"
 
     def _save_kyc_from_booking(self, args: dict) -> None:

@@ -22,6 +22,17 @@ class ExtractedStaff(BaseModel):
     service_names: list[str] = Field(default_factory=list)
 
 
+class ExtractedFAQ(BaseModel):
+    question: str
+    answer: str
+    category: str | None = None
+
+
+class ExtractedPolicy(BaseModel):
+    title: str
+    content: str
+
+
 class ExtractedBusiness(BaseModel):
     name: str | None = None
     description: str | None = None
@@ -36,6 +47,8 @@ class DocumentExtractionResult(BaseModel):
     opening_hours: list[ExtractedOpeningHour] = Field(default_factory=list)
     services: list[ExtractedService] = Field(default_factory=list)
     staff: list[ExtractedStaff] = Field(default_factory=list)
+    faqs: list[ExtractedFAQ] = Field(default_factory=list)
+    policies: list[ExtractedPolicy] = Field(default_factory=list)
 
 
 class ExtractionSummary(BaseModel):
@@ -46,6 +59,10 @@ class ExtractionSummary(BaseModel):
     services_updated: int = 0
     staff_created: int = 0
     staff_updated: int = 0
+    faqs_created: int = 0
+    faqs_updated: int = 0
+    policies_created: int = 0
+    policies_updated: int = 0
 
     def is_empty(self) -> bool:
         return not (
@@ -55,6 +72,10 @@ class ExtractionSummary(BaseModel):
             or self.services_updated
             or self.staff_created
             or self.staff_updated
+            or self.faqs_created
+            or self.faqs_updated
+            or self.policies_created
+            or self.policies_updated
         )
 
     def to_text(self) -> str:
@@ -69,4 +90,8 @@ class ExtractionSummary(BaseModel):
             parts.append(f"{self.services_created} new / {self.services_updated} updated services")
         if self.staff_created or self.staff_updated:
             parts.append(f"{self.staff_created} new / {self.staff_updated} updated staff")
+        if self.faqs_created or self.faqs_updated:
+            parts.append(f"{self.faqs_created} new / {self.faqs_updated} updated FAQs")
+        if self.policies_created or self.policies_updated:
+            parts.append(f"{self.policies_created} new / {self.policies_updated} updated policies")
         return "Updated from this document — " + "; ".join(parts) + "."

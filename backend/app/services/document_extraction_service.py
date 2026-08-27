@@ -13,8 +13,8 @@ from app.services.llm_service import get_llm_service
 
 logger = logging.getLogger(__name__)
 
-MAX_EXTRACTION_CHARS = 60_000
-EXTRACTION_MAX_TOKENS = 5000
+MAX_EXTRACTION_CHARS = 18_000
+EXTRACTION_MAX_TOKENS = 2000
 
 EXTRACTION_SYSTEM_PROMPT = """You extract structured business facts from a document so they can be \
 saved into a database. Read the document text and return ONLY a single valid JSON object — no \
@@ -36,6 +36,12 @@ markdown fences, no commentary, no trailing text — matching exactly this shape
   ],
   "staff": [
     {"name": string, "email": string or null, "phone": string or null, "service_names": [string, ...]}
+  ],
+  "faqs": [
+    {"question": string, "answer": string, "category": string or null}
+  ],
+  "policies": [
+    {"title": string, "content": string}
   ]
 }
 
@@ -43,13 +49,19 @@ Rules:
 - Use information ONLY from the document text. Never invent, guess, or fill in plausible-sounding
   values.
 - If a field genuinely isn't mentioned anywhere in the document, use null (or an empty list for
-  opening_hours/services/staff/service_names) — do not omit the key.
+  opening_hours/services/staff/faqs/policies/service_names) — do not omit the key.
 - day_of_week must be a full weekday name (Monday..Sunday). Only include days actually mentioned.
   Times should be 24-hour "HH:MM" strings when a specific time is stated.
 - Only list a "service" if it's something customers can book/purchase (with or without a stated
   price/duration) — not general amenities.
 - Only list "staff" if named individuals are mentioned as people who provide the services (not
   generic phrases like "our team").
+- List a "faq" for any explicit question-and-answer pair in the document, or any standalone
+  statement that answers a question a customer would plausibly ask (e.g. "Do you accept walk-ins?
+  Yes, ..."). Keep the question phrased naturally, as a customer would ask it.
+- List a "policy" for any rule/procedure a customer needs to follow or be aware of — cancellation
+  policy, refund policy, late-arrival policy, age restrictions, deposit requirements, etc. Give
+  each a short descriptive title (e.g. "Cancellation Policy") and the full rule as content.
 - Output raw JSON only. Do not wrap it in ```json fences or any other text.
 """
 
@@ -58,7 +70,6 @@ class DocumentExtractionService:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    # --- LLM call + parsing -------------------------------------------------
 
     def _call_llm(self, document_text: str) -> DocumentExtractionResult | None:
         try:
@@ -111,7 +122,7 @@ class DocumentExtractionService:
 
         for field in ("name", "description", "address", "phone", "email"):
             value = getattr(extracted, field)
-            if value:  # the uploaded document takes priority whenever it has a value
+            if value:  
                 setattr(business, field, value)
                 summary.business_fields_updated.append(field)
 
@@ -137,6 +148,8 @@ class DocumentExtractionService:
             s.name.strip().lower(): s for s in self.db.query(Service).filter(Service.business_id == business.id)
         }
         for item in extracted_services:
+            if not item.name or not item.name.strip():
+                continue  
             key = item.name.strip().lower()
             service = services_by_name.get(key)
             if service is None:
@@ -162,6 +175,8 @@ class DocumentExtractionService:
             return
         existing_staff = {s.name.strip().lower(): s for s in self.db.query(Staff).all()}
         for item in extracted_staff:
+            if not item.name or not item.name.strip():
+                continue  
             key = item.name.strip().lower()
             member = existing_staff.get(key)
             if member is None:
@@ -182,6 +197,54 @@ class DocumentExtractionService:
                 if service is not None and service not in member.services:
                     member.services.append(service)
 
+    def _apply_faqs(self, business, extracted_faqs, summary: ExtractionSummary) -> None:
+        if not extracted_faqs:
+            return
+        from app.models.knowledge_base import FAQ
+
+        existing = {
+            f.question.strip().lower(): f
+            for f in self.db.query(FAQ).filter(FAQ.business_id == business.id)
+        }
+        for item in extracted_faqs:
+            if not item.question or not item.answer:
+                continue
+            key = item.question.strip().lower()
+            faq = existing.get(key)
+            if faq is None:
+                faq = FAQ(business_id=business.id, question=item.question.strip())
+                self.db.add(faq)
+                existing[key] = faq
+                summary.faqs_created += 1
+            else:
+                summary.faqs_updated += 1
+            faq.answer = item.answer
+            if item.category:
+                faq.category = item.category
+
+    def _apply_policies(self, business, extracted_policies, summary: ExtractionSummary) -> None:
+        if not extracted_policies:
+            return
+        from app.models.knowledge_base import Policy
+
+        existing = {
+            p.title.strip().lower(): p
+            for p in self.db.query(Policy).filter(Policy.business_id == business.id)
+        }
+        for item in extracted_policies:
+            if not item.title or not item.content:
+                continue
+            key = item.title.strip().lower()
+            policy = existing.get(key)
+            if policy is None:
+                policy = Policy(business_id=business.id, title=item.title.strip())
+                self.db.add(policy)
+                existing[key] = policy
+                summary.policies_created += 1
+            else:
+                summary.policies_updated += 1
+            policy.content = item.content
+
     def extract_and_apply(self, document_text: str) -> ExtractionSummary:
        
         summary = ExtractionSummary()
@@ -196,6 +259,8 @@ class DocumentExtractionService:
             self._apply_opening_hours(business, result.opening_hours, summary)
             services_by_name = self._apply_services(business, result.services, summary)
             self._apply_staff(result.staff, services_by_name, summary)
+            self._apply_faqs(business, result.faqs, summary)
+            self._apply_policies(business, result.policies, summary)
             self.db.commit()
         except Exception:
             logger.exception("Failed to apply extracted document fields to the database")
