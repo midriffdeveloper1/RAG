@@ -52,6 +52,9 @@ def get_analytics_overview(
         .scalar()
         or 0
     )
+    escalated_chat_sessions = (
+        db.query(func.count(ChatSession.id)).filter(ChatSession.needs_human.is_(True)).scalar() or 0
+    )
 
     return AnalyticsOverview(
         total_documents=total_documents,
@@ -69,4 +72,5 @@ def get_analytics_overview(
         total_chat_sessions=total_chat_sessions,
         chat_sessions_last_7_days=chat_sessions_last_7_days,
         documents_failed=documents_failed,
+        escalated_chat_sessions=escalated_chat_sessions,
     )

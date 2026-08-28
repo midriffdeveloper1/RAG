@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 
 
 class FAQOut(BaseModel):
-    id: int
+    id: str
     question: str
     answer: str
     category: str | None = None
@@ -23,7 +23,7 @@ class FAQUpdate(BaseModel):
 
 
 class PolicyOut(BaseModel):
-    id: int
+    id: str
     title: str
     content: str
 

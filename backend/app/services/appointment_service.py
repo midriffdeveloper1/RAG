@@ -195,6 +195,17 @@ class AppointmentService:
         if opening is None or opening.is_closed or not opening.open_time:
             return {"slots": [], "message": f"We're closed on {day_name(target_date)}s."}
 
+        from app.services.holiday_service import HolidayService
+
+        closure = HolidayService(self.db).get_closure_for_date(business.id, target_date)
+        closed_start = closed_end = None
+        if closure is not None:
+            if closure.is_full_day:
+                reason = f" — {closure.note}" if closure.note else ""
+                return {"slots": [], "message": f"We're closed on {target_date}{reason}."}
+            closed_start = parse_time(closure.start_time)
+            closed_end = parse_time(closure.end_time)
+
         qualified_staff = [s for s in service.staff if s.is_active]
         if staff_name:
             staff = self._get_staff(staff_name)
@@ -223,6 +234,8 @@ class AppointmentService:
             if exclude_appointment_id is not None:
                 busy_query = busy_query.filter(Appointment.id != exclude_appointment_id)
             busy_ranges = [(b.start_time, b.end_time) for b in busy_query.all()]
+            if closed_start is not None and closed_end is not None:
+                busy_ranges.append((closed_start, closed_end))
 
             cursor = datetime.combine(target_date, open_t)
             day_end = datetime.combine(target_date, close_t)

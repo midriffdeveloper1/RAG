@@ -172,6 +172,42 @@ export async function deletePolicy(policyId) {
   await apiClient.delete(`/admin/business/policies/${policyId}`);
 }
 
+export async function listHolidays() {
+  const { data } = await apiClient.get("/admin/holidays");
+  return data;
+}
+
+export async function createHoliday(payload) {
+  const { data } = await apiClient.post("/admin/holidays", payload);
+  return data;
+}
+
+export async function updateHoliday(holidayId, payload) {
+  const { data } = await apiClient.patch(`/admin/holidays/${holidayId}`, payload);
+  return data;
+}
+
+export async function deleteHoliday(holidayId) {
+  await apiClient.delete(`/admin/holidays/${holidayId}`);
+}
+
+export async function listConversations({ page = 1, pageSize = 10, needsHuman = false } = {}) {
+  const { data } = await apiClient.get("/admin/conversations", {
+    params: { page, page_size: pageSize, needs_human: needsHuman },
+  });
+  return data;
+}
+
+export async function getConversation(sessionId) {
+  const { data } = await apiClient.get(`/admin/conversations/${sessionId}`);
+  return data;
+}
+
+export async function resolveConversation(sessionId) {
+  const { data } = await apiClient.post(`/admin/conversations/${sessionId}/resolve`);
+  return data;
+}
+
 export async function getChatbotConfig() {
   const { data } = await apiClient.get("/admin/chatbot-config");
   return data;

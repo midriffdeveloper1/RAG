@@ -7,6 +7,7 @@ import AdminLogin from "./pages/AdminLogin.jsx";
 import AdminAppointmentsPage from "./pages/admin/AdminAppointmentsPage.jsx";
 import AdminBusinessPage from "./pages/admin/AdminBusinessPage.jsx";
 import AdminChatbotConfigPage from "./pages/admin/AdminChatbotConfigPage.jsx";
+import AdminConversationsPage from "./pages/admin/AdminConversationsPage.jsx";
 import AdminCustomersPage from "./pages/admin/AdminCustomersPage.jsx";
 import AdminKnowledgeBasePage from "./pages/admin/AdminKnowledgeBasePage.jsx";
 import AdminOverview from "./pages/admin/AdminOverview.jsx";
@@ -39,6 +40,7 @@ export default function App() {
             <Route path="staff" element={<AdminStaffPage />} />
             <Route path="services" element={<AdminServicesPage />} />
             <Route path="appointments" element={<AdminAppointmentsPage />} />
+            <Route path="conversations" element={<AdminConversationsPage />} />
             <Route path="customers" element={<AdminCustomersPage />} />
             <Route path="knowledge-base" element={<AdminKnowledgeBasePage />} />
             <Route path="business" element={<AdminBusinessPage />} />

@@ -50,11 +50,12 @@ def update_chatbot_config(
 
 @router.get("/preview-prompt")
 def preview_system_prompt(db: Session = Depends(get_db), admin: Admin = Depends(get_current_admin)):
-    
-    from app.services.agent_service import AgentService
+
+    from app.services.agents.orchestrator import OrchestratorService
 
     try:
-        agent = AgentService(db)
+        orchestrator = OrchestratorService(db)
+        prompt = orchestrator.preview_system_prompt()
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
-    return {"prompt": agent.preview_system_prompt()}
+    return {"prompt": prompt}

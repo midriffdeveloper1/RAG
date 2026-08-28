@@ -27,8 +27,8 @@ class ChatSessionService:
         self.db.flush()
         return session
 
-    def append_message(self, session: ChatSession, role: str, content: str) -> None:
-        self.db.add(ChatMessage(session_id=session.id, role=role, content=content))
+    def append_message(self, session: ChatSession, role: str, content: str, agent: str | None = None) -> None:
+        self.db.add(ChatMessage(session_id=session.id, role=role, content=content, agent=agent))
         if role == "user" and not session.title:
             session.title = content.strip()[:TITLE_MAX_LENGTH]
         session.updated_at = datetime.utcnow()
@@ -85,6 +85,30 @@ class ChatSessionService:
         self.db.delete(session)
         self.db.commit()
         return True
+
+    def admin_list_paginated(
+        self, page: int, page_size: int, needs_human_only: bool = False
+    ) -> tuple[list[ChatSession], int]:
+        query = self.db.query(ChatSession)
+        if needs_human_only:
+            query = query.filter(ChatSession.needs_human.is_(True))
+        query = query.order_by(ChatSession.updated_at.desc())
+        total = query.count()
+        items = query.offset((page - 1) * page_size).limit(page_size).all()
+        return items, total
+
+    def admin_get(self, session_id: str) -> ChatSession | None:
+        return self.db.query(ChatSession).filter(ChatSession.id == session_id).first()
+
+    def admin_resolve(self, session_id: str) -> ChatSession | None:
+        session = self.admin_get(session_id)
+        if session is None:
+            return None
+        session.needs_human = False
+        session.unresolved_streak = 0
+        self.db.commit()
+        self.db.refresh(session)
+        return session
 
     def purge_stale_sessions(self, retention_hours: int) -> int:
         

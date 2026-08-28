@@ -7,7 +7,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in_minutes: int
 class AdminOut(BaseModel):
-    id: int
+    id: str
     email: EmailStr
 
     model_config = {"from_attributes": True}

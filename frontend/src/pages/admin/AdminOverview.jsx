@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Briefcase,
   Calendar,
@@ -95,6 +96,14 @@ export default function AdminOverview() {
           {data.chat_sessions_last_7_days} new session{data.chat_sessions_last_7_days === 1 ? "" : "s"} in the
           last 7 days
         </p>
+        {data.escalated_chat_sessions > 0 && (
+          <p className="admin-panel__footnote" style={{ color: "var(--danger, #d64545)" }}>
+            <Link to="/admin/conversations?needsHuman=1" style={{ color: "inherit" }}>
+              {data.escalated_chat_sessions} conversation{data.escalated_chat_sessions === 1 ? "" : "s"} handed off
+              to a human by the Support Agent — review in Conversations
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   );

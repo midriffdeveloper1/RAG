@@ -23,7 +23,7 @@ class FAQPolicyService:
         self.db.refresh(faq)
         return faq
 
-    def update_faq(self, faq_id: int, payload: FAQUpdate) -> FAQ | None:
+    def update_faq(self, faq_id: str, payload: FAQUpdate) -> FAQ | None:
         faq = self.db.query(FAQ).filter(FAQ.id == faq_id).first()
         if faq is None:
             return None
@@ -33,7 +33,7 @@ class FAQPolicyService:
         self.db.refresh(faq)
         return faq
 
-    def delete_faq(self, faq_id: int) -> bool:
+    def delete_faq(self, faq_id: str) -> bool:
         faq = self.db.query(FAQ).filter(FAQ.id == faq_id).first()
         if faq is None:
             return False
@@ -54,7 +54,7 @@ class FAQPolicyService:
         self.db.refresh(policy)
         return policy
 
-    def update_policy(self, policy_id: int, payload: PolicyUpdate) -> Policy | None:
+    def update_policy(self, policy_id: str, payload: PolicyUpdate) -> Policy | None:
         policy = self.db.query(Policy).filter(Policy.id == policy_id).first()
         if policy is None:
             return None
@@ -64,7 +64,7 @@ class FAQPolicyService:
         self.db.refresh(policy)
         return policy
 
-    def delete_policy(self, policy_id: int) -> bool:
+    def delete_policy(self, policy_id: str) -> bool:
         policy = self.db.query(Policy).filter(Policy.id == policy_id).first()
         if policy is None:
             return False

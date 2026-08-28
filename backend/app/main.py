@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
+    admin_chat_sessions,
     analytics,
     appointments,
     auth,
@@ -13,6 +14,7 @@ from app.api.routes import (
     customers,
     documents,
     health,
+    holiday,
     public_config,
     services,
     staff,
@@ -58,6 +60,8 @@ app.include_router(chat.router, prefix=settings.api_v1_prefix)
 app.include_router(chat_sessions.router, prefix=settings.api_v1_prefix)
 app.include_router(customers.router, prefix=settings.api_v1_prefix)
 app.include_router(customers.admin_router, prefix=settings.api_v1_prefix)
+app.include_router(holiday.router, prefix=settings.api_v1_prefix)
+app.include_router(admin_chat_sessions.router, prefix=settings.api_v1_prefix)
 
 @app.get("/")
 def root():

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.schemas.chat import ChatRequest, ChatResponse
-from app.services.agent_service import AgentService
+from app.services.agents.orchestrator import OrchestratorService
 from app.services.chat_session_service import ChatSessionService
 from app.services.customer_service import CustomerService
 from app.services.onboarding_service import OnboardingService
@@ -55,8 +55,8 @@ def chat_endpoint(payload: ChatRequest, background_tasks: BackgroundTasks, db: S
         answer = result.reply
         if result.identified and result.remainder and len(result.remainder) > 3:
             try:
-                agent = AgentService(db, browser_id=payload.browser_id, customer=session.customer)
-                follow_up = agent.answer(result.remainder, session.id, [])
+                orchestrator = OrchestratorService(db, browser_id=payload.browser_id, customer=session.customer)
+                follow_up = orchestrator.answer(result.remainder, session, [])
                 answer = f"{answer}\n\n{follow_up.answer}"
             except (RuntimeError, GroqError):
                 pass  
@@ -68,8 +68,8 @@ def chat_endpoint(payload: ChatRequest, background_tasks: BackgroundTasks, db: S
     sessions.append_message(session, "user", payload.question)
 
     try:
-        agent = AgentService(db, browser_id=payload.browser_id, customer=session.customer)
-        response = agent.answer(payload.question, session.id, history)
+        orchestrator = OrchestratorService(db, browser_id=payload.browser_id, customer=session.customer)
+        response = orchestrator.answer(payload.question, session, history)
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
     except GroqError as exc:
@@ -79,6 +79,6 @@ def chat_endpoint(payload: ChatRequest, background_tasks: BackgroundTasks, db: S
             detail="The assistant is temporarily unavailable. Please try again shortly.",
         )
 
-    sessions.append_message(session, "assistant", response.answer)
+    sessions.append_message(session, "assistant", response.answer, agent=response.agent)
     response.session_id = session.id
     return response

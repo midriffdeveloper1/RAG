@@ -38,3 +38,5 @@ class ChatResponse(BaseModel):
     answer: str
     sources: List[SourceChunk] = Field(default_factory=list)
     session_id: str
+    needs_human: bool = False
+    agent: Optional[str] = None

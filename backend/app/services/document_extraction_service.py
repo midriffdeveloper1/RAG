@@ -13,8 +13,8 @@ from app.services.llm_service import get_llm_service
 
 logger = logging.getLogger(__name__)
 
-MAX_EXTRACTION_CHARS = 18_000
-EXTRACTION_MAX_TOKENS = 2000
+MAX_EXTRACTION_CHARS = 30_000
+EXTRACTION_MAX_TOKENS = 6000
 
 EXTRACTION_SYSTEM_PROMPT = """You extract structured business facts from a document so they can be \
 saved into a database. Read the document text and return ONLY a single valid JSON object — no \

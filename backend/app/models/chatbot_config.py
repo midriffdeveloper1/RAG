@@ -4,6 +4,7 @@ from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from app.core.ids import generate_id
 
 
 class ChatbotTone(str):
@@ -12,24 +13,17 @@ class ChatbotTone(str):
 
 
 class ChatbotConfig(Base):
-    """Singleton table (always exactly one row) holding every admin-editable
-    setting that shapes how the chat widget looks and behaves. Kept separate
-    from `Business` (which is the factual business record) so branding/behaviour
-    settings can evolve independently.
-    """
-
+   
     __tablename__ = "chatbot_config"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[str] = mapped_column(String(16), primary_key=True, default=generate_id)
 
-    # Identity / branding
     widget_title: Mapped[str] = mapped_column(String(120), default="AI Support Assistant")
     tagline: Mapped[str] = mapped_column(String(160), default="Support Assistant")
     avatar_emoji: Mapped[str] = mapped_column(String(8), default="✦")
     primary_color: Mapped[str] = mapped_column(String(20), default="#6366f1")
     accent_color: Mapped[str] = mapped_column(String(20), default="#22c55e")
 
-    # Voice / behaviour
     tone: Mapped[str] = mapped_column(String(40), default="friendly")
     persona_instructions: Mapped[str] = mapped_column(Text, nullable=True)
     greeting_message: Mapped[str] = mapped_column(
@@ -42,13 +36,11 @@ class ChatbotConfig(Base):
     max_reply_words: Mapped[int] = mapped_column(Integer, default=80)
     temperature: Mapped[float] = mapped_column(Float, default=0.3)
 
-    # Feature toggles
     enable_appointment_booking: Mapped[bool] = mapped_column(Boolean, default=True)
     enable_knowledge_base: Mapped[bool] = mapped_column(Boolean, default=True)
     enable_email_gate: Mapped[bool] = mapped_column(Boolean, default=True)
     show_suggested_questions: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    # Stored as a comma-separated list to avoid a JSON column dependency.
     suggested_questions: Mapped[str] = mapped_column(
         Text,
         default=(

@@ -28,3 +28,37 @@ class ChatSessionDetailResponse(BaseModel):
     id: str
     title: str | None = None
     messages: list[ChatMessageOut]
+
+
+class ChatMessageAdminOut(BaseModel):
+    role: str
+    content: str
+    agent: str | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ChatSessionAdminOut(BaseModel):
+    id: str
+    title: str | None = None
+    customer_email: str | None = None
+    needs_human: bool
+    escalation_reason: str | None = None
+    escalated_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ChatSessionAdminListResponse(BaseModel):
+    items: list[ChatSessionAdminOut]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class ChatSessionAdminDetailResponse(ChatSessionAdminOut):
+    messages: list[ChatMessageAdminOut]

@@ -4,7 +4,7 @@ from app.schemas.faq_policy import FAQOut, PolicyOut
 
 
 class OpeningHourOut(BaseModel):
-    id: int
+    id: str
     day_of_week: str
     open_time: str | None = None
     close_time: str | None = None
@@ -21,7 +21,7 @@ class OpeningHourUpdate(BaseModel):
 
 
 class BusinessOut(BaseModel):
-    id: int
+    id: str
     name: str
     description: str | None = None
     address: str | None = None

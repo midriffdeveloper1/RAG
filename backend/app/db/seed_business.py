@@ -1,10 +1,11 @@
 import logging
+from datetime import date
 
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.database import SessionLocal
-from app.models.knowledge_base import Business, OpeningHour, Service
+from app.models.knowledge_base import Business, Holiday, OpeningHour, Service
 from app.models.staff import Staff
 
 
@@ -321,6 +322,7 @@ OPENING_HOURS = [
 
 
 # Staff
+# Dummy staff data for RAG / development / testing.
 STAFF = [
     {
         "name": "Ayesha Khan",
@@ -382,6 +384,163 @@ STAFF = [
             "Eyebrow Shaping",
             "Eyebrow Tint",
             "Upper Lip / Chin Threading or Wax",
+        ],
+    },
+    {
+        "name": "Neha Sharma",
+        "email": "neha@example.com",
+        "phone": "9800000004",
+        "services": [
+            "Gold Facial",
+            "Hydra Facial",
+            "Red Wine Facial",
+            "Oxy Bubble Facial",
+            "Express Clean-Up",
+            "De-Tan & Bleach (Face)",
+            "Party & Event Makeup",
+            "Bridal Trial",
+        ],
+    },
+    {
+        "name": "Karan Singh",
+        "email": "karan@example.com",
+        "phone": "9800000005",
+        "services": [
+            "Precision Haircut",
+            "Global Hair Colour",
+            "Highlights & Balayage",
+            "Keratin Smoothening",
+            "Hair Botox Treatment",
+            "Blow-Dry & Style",
+            "Restoration Hair Spa",
+            "Olaplex Bonding Ritual",
+        ],
+    },
+    {
+        "name": "Priya Verma",
+        "email": "priya@example.com",
+        "phone": "9800000006",
+        "services": [
+            "Classic Manicure",
+            "Spa Pedicure",
+            "Gel Polish",
+            "Acrylic / Gel Extensions",
+            "Nail Art",
+        ],
+    },
+    {
+        "name": "Manpreet Kaur",
+        "email": "manpreet@example.com",
+        "phone": "9800000007",
+        "services": [
+            "Aromatherapy Massage",
+            "Deep-Tissue Massage",
+            "Head & Shoulder Massage",
+            "Hot-Stone Therapy",
+            "Body Polish & Scrub",
+        ],
+    },
+    {
+        "name": "Arjun Malhotra",
+        "email": "arjun@example.com",
+        "phone": "9800000008",
+        "services": [
+            "Precision Haircut",
+            "Blow-Dry & Style",
+            "Head & Shoulder Massage",
+            "Anti-Dandruff Therapy",
+        ],
+    },
+    {
+        "name": "Jasleen Gill",
+        "email": "jasleen@example.com",
+        "phone": "9800000009",
+        "services": [
+            "Full-Body Waxing",
+            "Eyebrow Shaping",
+            "Eyebrow Tint",
+            "Upper Lip / Chin Threading or Wax",
+            "Express Clean-Up",
+            "De-Tan & Bleach (Face)",
+        ],
+    },
+    {
+        "name": "Riya Kapoor",
+        "email": "riya@example.com",
+        "phone": "9800000010",
+        "services": [
+            "Party & Event Makeup",
+            "Engagement / Sangeet Makeup",
+            "Bridal Trial",
+            "The Quasar Bridal Day",
+            "Blow-Dry & Style",
+        ],
+    },
+    {
+        "name": "Harpreet Singh",
+        "email": "harpreet@example.com",
+        "phone": "9800000011",
+        "services": [
+            "Deep-Tissue Massage",
+            "Aromatherapy Massage",
+            "Hot-Stone Therapy",
+            "Head & Shoulder Massage",
+            "Body Polish & Scrub",
+        ],
+    },
+    {
+        "name": "Mehak Arora",
+        "email": "mehak@example.com",
+        "phone": "9800000012",
+        "services": [
+            "Gold Facial",
+            "Hydra Facial",
+            "Oxy Bubble Facial",
+            "Red Wine Facial",
+            "Express Clean-Up",
+            "Classic Manicure",
+            "Spa Pedicure",
+            "Gel Polish",
+        ],
+    },
+    {
+        "name": "Sahil Bedi",
+        "email": "sahil@example.com",
+        "phone": "9800000013",
+        "services": [
+            "Precision Haircut",
+            "Global Hair Colour",
+            "Highlights & Balayage",
+            "Keratin Smoothening",
+            "Hair Botox Treatment",
+            "Blow-Dry & Style",
+        ],
+    },
+    {
+        "name": "Navneet Kaur",
+        "email": "navneet@example.com",
+        "phone": "9800000014",
+        "services": [
+            "Classic Manicure",
+            "Spa Pedicure",
+            "Gel Polish",
+            "Acrylic / Gel Extensions",
+            "Nail Art",
+            "Eyebrow Shaping",
+            "Eyebrow Tint",
+        ],
+    },
+    {
+        "name": "Ananya Joshi",
+        "email": "ananya@example.com",
+        "phone": "9800000015",
+        "services": [
+            "Party & Event Makeup",
+            "Engagement / Sangeet Makeup",
+            "Bridal Trial",
+            "The Quasar Bridal Day",
+            "Gold Facial",
+            "Hydra Facial",
         ],
     },
 ]
@@ -456,6 +615,24 @@ def seed_business_catalog() -> None:
             ]
 
             db.add(staff)
+
+       
+        db.add(
+            Holiday(
+                business_id=business.id,
+                day_of_week="Sunday",
+                is_full_day=True,
+                note="Weekly off",
+            )
+        )
+        db.add(
+            Holiday(
+                business_id=business.id,
+                date=date(date.today().year, 1, 26),
+                is_full_day=True,
+                note="Republic Day",
+            )
+        )
 
         db.commit()
 

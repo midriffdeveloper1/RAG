@@ -19,3 +19,4 @@ class AnalyticsOverview(BaseModel):
     total_chat_sessions: int
     chat_sessions_last_7_days: int
     documents_failed: int
+    escalated_chat_sessions: int = 0
