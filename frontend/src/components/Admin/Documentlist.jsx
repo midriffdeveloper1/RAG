@@ -7,7 +7,7 @@ import Pagination from "../common/Pagination.jsx";
 import { LoadingState, Spinner } from "../common/Spinner.jsx";
 import StatusBadge from "./StatusBadge.jsx";
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 10;
 
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;

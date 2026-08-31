@@ -28,11 +28,6 @@ _FRUSTRATION_PATTERNS = [
 
 UNRESOLVED_STREAK_THRESHOLD = 2
 
-HANDOFF_MESSAGE = (
-    "I've flagged this conversation for our team so a person can take it from here — they'll "
-    "follow up with you directly. Thanks for your patience!"
-)
-
 
 def _matches_any(patterns: list[str], text: str) -> bool:
     lowered = text.lower()
@@ -43,6 +38,7 @@ class SupportAgent:
     agent_name = "support"
 
     def check_message(self, question: str) -> str | None:
+       
         if _matches_any(_EXPLICIT_PATTERNS, question):
             return "Customer explicitly asked to speak with a human."
         if _matches_any(_FRUSTRATION_PATTERNS, question):
@@ -50,8 +46,7 @@ class SupportAgent:
         return None
 
     def check_streak(self, session: ChatSession) -> str | None:
-        print("+++++++++++++++++++++++++++++++++++++++++++support++++++++++++++++++++++++++++++++++++++++++++++++")
-        
+       
         if session.unresolved_streak >= UNRESOLVED_STREAK_THRESHOLD:
             return (
                 f"Assistant could not resolve the request after "
@@ -59,5 +54,10 @@ class SupportAgent:
             )
         return None
 
-    def handoff_reply(self) -> str:
-        return HANDOFF_MESSAGE
+    def handoff_reply(self, ticket_number: str) -> str:
+        return (
+            "I've flagged this conversation for our team so a person can take it from here — "
+            f"they'll follow up with you directly. Your ticket number is {ticket_number} — you "
+            "can check its status any time from the panel at the bottom of the sidebar. Thanks "
+            "for your patience!"
+        )

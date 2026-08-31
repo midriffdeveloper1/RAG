@@ -43,9 +43,13 @@ class ChatSessionAdminOut(BaseModel):
     id: str
     title: str | None = None
     customer_email: str | None = None
+    customer_name: str | None = None
+    customer_phone: str | None = None
     needs_human: bool
+    ticket_number: str | None = None
     escalation_reason: str | None = None
     escalated_at: datetime | None = None
+    resolved_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

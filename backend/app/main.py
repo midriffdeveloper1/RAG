@@ -18,6 +18,7 @@ from app.api.routes import (
     public_config,
     services,
     staff,
+    support_tickets,
 )
 from app.core.config import get_settings
 from app.db.init_db import init_db
@@ -62,6 +63,7 @@ app.include_router(customers.router, prefix=settings.api_v1_prefix)
 app.include_router(customers.admin_router, prefix=settings.api_v1_prefix)
 app.include_router(holiday.router, prefix=settings.api_v1_prefix)
 app.include_router(admin_chat_sessions.router, prefix=settings.api_v1_prefix)
+app.include_router(support_tickets.router, prefix=settings.api_v1_prefix)
 
 @app.get("/")
 def root():

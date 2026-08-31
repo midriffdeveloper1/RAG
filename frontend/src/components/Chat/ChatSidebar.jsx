@@ -1,5 +1,6 @@
 import { MessageSquare, Plus, Trash2, UserCog } from "../common/Icons.jsx";
 import { Spinner } from "../common/Spinner.jsx";
+import TicketStatusPanel from "./TicketStatusPanel.jsx";
 
 export default function ChatSidebar({
   sessions,
@@ -72,6 +73,8 @@ export default function ChatSidebar({
           Not you? Switch account
         </button>
       )}
+
+      <TicketStatusPanel />
     </aside>
   );
 }

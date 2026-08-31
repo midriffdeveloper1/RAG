@@ -7,7 +7,7 @@ import Pagination from "../common/Pagination.jsx";
 import { LoadingState, Spinner } from "../common/Spinner.jsx";
 import StaffModal from "./StaffModal.jsx";
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 10;
 
 export default function StaffList({ services = [] }) {
   const [busyId, setBusyId] = useState(null);

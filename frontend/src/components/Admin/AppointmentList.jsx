@@ -9,7 +9,7 @@ import AppointmentModal from "./AppointmentModal.jsx";
 import StatusBadge from "./StatusBadge.jsx";
 
 const STATUS_OPTIONS = ["booked", "cancelled", "completed"];
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 10;
 
 export default function AppointmentList({ services = [], staff = [] }) {
   const [statusFilter, setStatusFilter] = useState("");

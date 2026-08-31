@@ -70,3 +70,8 @@ export async function checkHealth() {
   const { data } = await apiClient.get("/health");
   return data;
 }
+
+export async function getTicketStatus(ticketNumber) {
+  const { data } = await apiClient.get(`/support/tickets/${encodeURIComponent(ticketNumber)}`);
+  return data;
+}

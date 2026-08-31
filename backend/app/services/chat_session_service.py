@@ -45,11 +45,16 @@ class ChatSessionService:
         limit = max_exchanges * 2
         return turns[-limit:] if limit else turns
 
+    # --- Customer-facing (hidden_from_customer sessions are invisible here) ---
 
     def list_sessions(self, browser_id: str, customer_id: str) -> list[ChatSession]:
         return (
             self.db.query(ChatSession)
-            .filter(ChatSession.browser_id == browser_id, ChatSession.customer_id == customer_id)
+            .filter(
+                ChatSession.browser_id == browser_id,
+                ChatSession.customer_id == customer_id,
+                ChatSession.hidden_from_customer.is_(False),
+            )
             .order_by(ChatSession.updated_at.desc())
             .all()
         )
@@ -61,6 +66,7 @@ class ChatSessionService:
                 ChatSession.id == session_id,
                 ChatSession.browser_id == browser_id,
                 ChatSession.customer_id == customer_id,
+                ChatSession.hidden_from_customer.is_(False),
             )
             .first()
         )
@@ -74,7 +80,6 @@ class ChatSessionService:
         return True
 
     def discard_session(self, session_id: str, browser_id: str) -> bool:
-        
         session = (
             self.db.query(ChatSession)
             .filter(ChatSession.id == session_id, ChatSession.browser_id == browser_id)
@@ -85,6 +90,32 @@ class ChatSessionService:
         self.db.delete(session)
         self.db.commit()
         return True
+
+    # --- Support Agent hand-off / ticketing ---
+
+    def escalate(self, session: ChatSession, reason: str) -> ChatSession:
+        from app.services.support_ticket_service import SupportTicketService
+
+        tickets = SupportTicketService(self.db)
+
+        if session.ticket_number is None:
+            ticket = tickets.create_from_session(session, reason)
+            session.ticket_number = ticket.ticket_number
+        else:
+            tickets.reopen(session.ticket_number)
+
+        session.needs_human = True
+        session.hidden_from_customer = True
+        session.awaiting_contact_info = False
+        session.unresolved_streak = 0
+        session.escalation_reason = reason
+        session.escalated_at = datetime.utcnow()
+        session.resolved_at = None
+        self.db.commit()
+        self.db.refresh(session)
+        return session
+
+    # --- Admin-facing (Conversations page — sees everything, hidden or not) ---
 
     def admin_list_paginated(
         self, page: int, page_size: int, needs_human_only: bool = False
@@ -106,14 +137,34 @@ class ChatSessionService:
             return None
         session.needs_human = False
         session.unresolved_streak = 0
+        session.resolved_at = datetime.utcnow()
         self.db.commit()
+
+        if session.ticket_number:
+            from app.services.support_ticket_service import SupportTicketService
+
+            SupportTicketService(self.db).resolve(session.ticket_number)
+
         self.db.refresh(session)
         return session
 
+    def admin_delete(self, session_id: str) -> bool:
+        session = self.admin_get(session_id)
+        if session is None:
+            return False
+        if session.ticket_number:
+            from app.services.support_ticket_service import SupportTicketService
+
+            SupportTicketService(self.db).delete_by_number(session.ticket_number)
+        self.db.delete(session)
+        self.db.commit()
+        return True
+
     def purge_stale_sessions(self, retention_hours: int) -> int:
-        
         cutoff = datetime.utcnow() - timedelta(hours=retention_hours)
-        stale = self.db.query(ChatSession).filter(ChatSession.updated_at < cutoff)
+        stale = self.db.query(ChatSession).filter(
+            ChatSession.updated_at < cutoff, ChatSession.hidden_from_customer.is_(False)
+        )
         count = stale.count()
         if count:
             for session in stale.all():

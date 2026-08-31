@@ -7,7 +7,7 @@ import Pagination from "../common/Pagination.jsx";
 import { LoadingState, Spinner } from "../common/Spinner.jsx";
 import CustomerModal from "./CustomerModal.jsx";
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 10;
 
 function formatDate(isoString) {
   return new Date(isoString).toLocaleDateString();

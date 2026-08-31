@@ -208,6 +208,10 @@ export async function resolveConversation(sessionId) {
   return data;
 }
 
+export async function deleteConversation(sessionId) {
+  await apiClient.delete(`/admin/conversations/${sessionId}`);
+}
+
 export async function getChatbotConfig() {
   const { data } = await apiClient.get("/admin/chatbot-config");
   return data;

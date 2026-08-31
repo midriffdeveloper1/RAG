@@ -53,16 +53,23 @@ def chat_endpoint(payload: ChatRequest, background_tasks: BackgroundTasks, db: S
         sessions.append_message(session, "user", payload.question)
 
         answer = result.reply
+        follow_up = None
         if result.identified and result.remainder and len(result.remainder) > 3:
             try:
                 orchestrator = OrchestratorService(db, browser_id=payload.browser_id, customer=session.customer)
-                follow_up = orchestrator.answer(result.remainder, session, [])
+                follow_up = orchestrator.answer(result.remainder, session, [], persist=False)
                 answer = f"{answer}\n\n{follow_up.answer}"
             except (RuntimeError, GroqError):
                 pass  
 
         sessions.append_message(session, "assistant", answer)
-        return ChatResponse(answer=answer, sources=[], session_id=session.id)
+        return ChatResponse(
+            answer=answer,
+            sources=[],
+            session_id=session.id,
+            needs_human=bool(follow_up and follow_up.needs_human),
+            ticket_number=follow_up.ticket_number if follow_up else None,
+        )
 
     history = sessions.get_history(session.id, settings.max_history_exchanges)
     sessions.append_message(session, "user", payload.question)
@@ -79,6 +86,5 @@ def chat_endpoint(payload: ChatRequest, background_tasks: BackgroundTasks, db: S
             detail="The assistant is temporarily unavailable. Please try again shortly.",
         )
 
-    sessions.append_message(session, "assistant", response.answer, agent=response.agent)
     response.session_id = session.id
     return response

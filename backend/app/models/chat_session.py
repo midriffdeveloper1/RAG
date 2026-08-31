@@ -21,6 +21,10 @@ class ChatSession(Base):
     needs_human: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     escalation_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     escalated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ticket_number: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True, index=True)
+    hidden_from_customer: Mapped[bool] = mapped_column(Boolean, default=False)
+    awaiting_contact_info: Mapped[bool] = mapped_column(Boolean, default=False)
     unresolved_streak: Mapped[int] = mapped_column(default=0)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -41,6 +45,7 @@ class ChatMessage(Base):
     session_id: Mapped[str] = mapped_column(ForeignKey("chat_sessions.id"), index=True, nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False)  # "user" | "assistant"
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    # Which agent produced this reply — "knowledge" | "booking" | "support" | None (user turns)
     agent: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 

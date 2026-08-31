@@ -80,16 +80,18 @@ export default function AdminConversationsPage() {
             <div className="data-table-wrapper">
               <table className="data-table">
                 <colgroup>
-                  <col style={{ width: "26%" }} />
-                  <col style={{ width: "24%" }} />
-                  <col style={{ width: "16%" }} />
-                  <col style={{ width: "17%" }} />
-                  <col style={{ width: "17%" }} />
+                  <col style={{ width: "22%" }} />
+                  <col style={{ width: "20%" }} />
+                  <col style={{ width: "14%" }} />
+                  <col style={{ width: "14%" }} />
+                  <col style={{ width: "15%" }} />
+                  <col style={{ width: "15%" }} />
                 </colgroup>
                 <thead>
                   <tr>
                     <th>Conversation</th>
                     <th>Customer</th>
+                    <th>Ticket</th>
                     <th>Status</th>
                     <th>Started</th>
                     <th>Last activity</th>
@@ -104,11 +106,14 @@ export default function AdminConversationsPage() {
                     >
                       <td className="data-table__primary">{session.title || "(no message yet)"}</td>
                       <td>{session.customer_email || "—"}</td>
+                      <td>{session.ticket_number || "—"}</td>
                       <td>
                         {session.needs_human ? (
                           <StatusBadge status="failed" />
-                        ) : (
+                        ) : session.ticket_number ? (
                           <StatusBadge status="completed" />
+                        ) : (
+                          "—"
                         )}
                       </td>
                       <td>{formatDateTime(session.created_at)}</td>
@@ -137,6 +142,7 @@ export default function AdminConversationsPage() {
           sessionId={activeSessionId}
           onClose={() => setActiveSessionId(null)}
           onResolved={reload}
+          onDeleted={reload}
         />
       )}
     </div>

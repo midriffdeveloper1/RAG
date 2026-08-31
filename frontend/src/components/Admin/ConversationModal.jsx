@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { getConversation, resolveConversation } from "../../services/adminApi.js";
-import { AlertCircle } from "../common/Icons.jsx";
+import { deleteConversation, getConversation, resolveConversation } from "../../services/adminApi.js";
+import { AlertCircle, Trash2 } from "../common/Icons.jsx";
 import Modal from "../common/Modal.jsx";
 import { LoadingState, Spinner } from "../common/Spinner.jsx";
 
@@ -14,11 +14,12 @@ function formatDateTime(isoString) {
   return new Date(isoString).toLocaleString();
 }
 
-export default function ConversationModal({ sessionId, onClose, onResolved }) {
+export default function ConversationModal({ sessionId, onClose, onResolved, onDeleted }) {
   const [session, setSession] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isResolving, setIsResolving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,10 +43,24 @@ export default function ConversationModal({ sessionId, onClose, onResolved }) {
     setIsResolving(true);
     try {
       const updated = await resolveConversation(sessionId);
-      setSession((prev) => (prev ? { ...prev, needs_human: updated.needs_human } : prev));
+      setSession((prev) =>
+        prev ? { ...prev, needs_human: updated.needs_human, resolved_at: updated.resolved_at } : prev
+      );
       onResolved?.();
     } finally {
       setIsResolving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm("Permanently delete this conversation? This can't be undone.")) return;
+    setIsDeleting(true);
+    try {
+      await deleteConversation(sessionId);
+      onDeleted?.();
+      onClose();
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -56,6 +71,17 @@ export default function ConversationModal({ sessionId, onClose, onResolved }) {
 
       {session && !isLoading && !error && (
         <div className="conversation-modal">
+          {session.ticket_number && (
+            <p className="settings-form__hint" style={{ margin: 0 }}>
+              Ticket <strong>{session.ticket_number}</strong>
+              {session.needs_human
+                ? " \u2014 open"
+                : session.resolved_at
+                ? ` \u2014 resolved ${formatDateTime(session.resolved_at)}`
+                : " \u2014 resolved"}
+            </p>
+          )}
+
           {session.needs_human && (
             <div className="conversation-modal__alert">
               <AlertCircle size={15} />
@@ -75,8 +101,12 @@ export default function ConversationModal({ sessionId, onClose, onResolved }) {
             </div>
           )}
 
-          {session.customer_email && (
-            <p className="settings-form__hint">Customer: {session.customer_email}</p>
+          {(session.customer_name || session.customer_phone || session.customer_email) && (
+            <p className="settings-form__hint">
+              {[session.customer_name, session.customer_phone, session.customer_email]
+                .filter(Boolean)
+                .join(" \u00b7 ")}
+            </p>
           )}
 
           <div className="conversation-modal__transcript">
@@ -92,6 +122,18 @@ export default function ConversationModal({ sessionId, onClose, onResolved }) {
                 <p>{msg.content}</p>
               </div>
             ))}
+          </div>
+
+          <div className="staff-modal-form__actions">
+            <button
+              type="button"
+              className="staff-modal-form__cancel"
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? <Spinner size={13} /> : <Trash2 size={13} />}
+              {isDeleting ? "Deleting…" : "Delete conversation"}
+            </button>
           </div>
         </div>
       )}

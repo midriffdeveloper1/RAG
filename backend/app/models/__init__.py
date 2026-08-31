@@ -6,3 +6,4 @@ from app.models.customer import Customer
 from app.models.document import Document, DocumentStatus
 from app.models.knowledge_base import Business, FAQ, Holiday, OpeningHour, Policy, Service
 from app.models.staff import Staff, staff_services
+from app.models.support_ticket import SupportTicket

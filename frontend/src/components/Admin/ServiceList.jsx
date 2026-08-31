@@ -7,7 +7,7 @@ import Pagination from "../common/Pagination.jsx";
 import { LoadingState, Spinner } from "../common/Spinner.jsx";
 import ServiceModal from "./ServiceModal.jsx";
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 10;
 
 export default function ServiceList() {
   const [busyId, setBusyId] = useState(null);
