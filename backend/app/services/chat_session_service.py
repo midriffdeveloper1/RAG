@@ -172,10 +172,6 @@ class ChatSessionService:
         session = self.admin_get(session_id)
         if session is None:
             return False
-        if session.ticket_number:
-            from app.services.support_ticket_service import SupportTicketService
-
-            SupportTicketService(self.db).delete_by_number(session.ticket_number)
         self.db.delete(session)
         self.db.commit()
         return True

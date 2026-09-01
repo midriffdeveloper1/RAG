@@ -44,6 +44,14 @@ Reply with EXACTLY this JSON shape and nothing else — no markdown, no explanat
 {"name": "<name or null>", "phone": "<phone or null>"}
 Use JSON null (not the text "null") for anything not clearly stated. Do not guess — only extract what's explicitly given."""
 
+_PHONE_PATTERN = re.compile(r"\+?\d[\d\-\s().]{7,14}\d")
+_NAME_STRIP_PATTERN = re.compile(
+    r"\b(my name'?s|my name is|i'?m|this is|call me|you can call me|name is|"
+    r"phone( number)? is|number is|reach me at|contact me at|and|is|the|at)\b",
+    re.IGNORECASE,
+)
+_JSON_OBJECT_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
+
 MAX_CONTACT_INFO_ATTEMPTS = 2
 
 _CONTACT_HINT_PATTERN = re.compile(
@@ -57,7 +65,34 @@ def _tokenize(text: str) -> set[str]:
     return set(re.findall(r"[a-z0-9']+", text.lower()))
 
 
+def _regex_extract_contact_info(message: str) -> tuple[str | None, str | None]:
+    phone = None
+    remainder = message
+    match = _PHONE_PATTERN.search(message)
+    if match:
+        digit_count = sum(c.isdigit() for c in match.group(0))
+        if 7 <= digit_count <= 15:
+            phone = match.group(0).strip()
+            remainder = (message[: match.start()] + " " + message[match.end() :]).strip()
+
+    cleaned = _NAME_STRIP_PATTERN.sub(" ", remainder)
+    cleaned = re.sub(r"[,:;.\-]+", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+
+    name = None
+    if cleaned and 1 <= len(cleaned.split()) <= 4 and re.fullmatch(r"[A-Za-z][A-Za-z '.-]*", cleaned):
+        name = cleaned.title()
+
+    return name, phone
+
+
+def _extract_json_object(raw: str) -> str:
+    match = _JSON_OBJECT_PATTERN.search(raw)
+    return match.group(0) if match else raw
+
+
 def _classify_intent_keywords(question: str, history: list[ChatTurn]) -> str:
+    """Fallback used only if the LLM classification call fails."""
     tokens = _tokenize(question)
     booking_score = len(tokens & _BOOKING_KEYWORDS)
     knowledge_score = len(tokens & _KNOWLEDGE_KEYWORDS)
@@ -88,6 +123,7 @@ class OrchestratorService:
     def preview_system_prompt(self) -> str:
         return BookingAgent(self.db, self.browser_id, self.customer).system_prompt()
 
+    # --- Turn classification: escalate? + which agent? (one combined LLM call) ---
 
     def _classify_turn(self, question: str, history: list[ChatTurn]) -> tuple[bool, str]:
         context_lines = [f"{turn.role}: {turn.content}" for turn in history[-6:]]
@@ -111,20 +147,26 @@ class OrchestratorService:
 
 
     def _extract_contact_info(self, message: str) -> tuple[str | None, str | None]:
+        name, phone = _regex_extract_contact_info(message)
+        if name and phone:
+            return name, phone
+
         try:
             raw = self.llm.generate(_CONTACT_EXTRACTION_SYSTEM_PROMPT, message, max_tokens=60, temperature=0)
-            data = json.loads(raw)
+            data = json.loads(_extract_json_object(raw))
+
+            def _clean(value):
+                if not isinstance(value, str):
+                    return None
+                value = value.strip()
+                return value if value and value.lower() not in {"null", "none"} else None
+
+            name = name or _clean(data.get("name"))
+            phone = phone or _clean(data.get("phone"))
         except Exception:  # noqa: BLE001 - extraction is best-effort
-            logger.exception("Contact-info extraction failed")
-            return None, None
+            logger.exception("Contact-info LLM extraction failed; relying on regex pass only")
 
-        def _clean(value):
-            if not isinstance(value, str):
-                return None
-            value = value.strip()
-            return value if value and value.lower() not in {"null", "none"} else None
-
-        return _clean(data.get("name")), _clean(data.get("phone"))
+        return name, phone
 
     def _missing_contact_fields(self) -> list[str]:
         missing = []
