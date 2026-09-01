@@ -30,19 +30,27 @@ _KNOWLEDGE_KEYWORDS = {
     "holiday", "holidays", "service", "services", "about", "who",
 }
 
-_INTENT_SYSTEM_PROMPT = """You are a routing classifier in front of a salon's chat assistant. Decide which specialist should handle the customer's LATEST message, using the conversation for context.
+_TURN_CLASSIFIER_SYSTEM_PROMPT = """You are a routing classifier in front of a salon's chat assistant. Look at the customer's LATEST message, using the conversation for context, and decide two things:
 
-- booking: checking availability, booking, rescheduling, cancelling an appointment, or anything about their own appointment/profile (including short follow-ups like confirming a time or giving their name/phone mid-booking).
-- knowledge: questions about the business itself — services, pricing, hours, holidays/closures, policies, FAQs, location, contact details.
+1. escalate — true if the customer is clearly asking to speak with a human/agent/manager/support, asking to "raise a ticket" or be "connected" to someone, or is expressing real frustration, anger, sarcasm, or insults directed at the assistant (not just a neutral "no" or mild disagreement). This should catch it regardless of exact phrasing, typos, or how it's worded — use your judgement the way a person reading the message would. False otherwise.
+2. intent — "booking" (checking availability, booking, rescheduling, cancelling, or anything about their own appointment/profile) or "knowledge" (services, pricing, hours, holidays/closures, policies, FAQs, location, contact details). Only meaningful when escalate is false — still fill it in either way.
 
-Reply with exactly one word, lowercase: booking or knowledge. Nothing else — no punctuation, no explanation."""
+Reply with EXACTLY this JSON shape and nothing else — no markdown, no explanation:
+{"escalate": true or false, "intent": "booking" or "knowledge"}"""
 
 _CONTACT_EXTRACTION_SYSTEM_PROMPT = """Extract a customer's name and phone number from their message, if present.
+
 Reply with EXACTLY this JSON shape and nothing else — no markdown, no explanation:
 {"name": "<name or null>", "phone": "<phone or null>"}
 Use JSON null (not the text "null") for anything not clearly stated. Do not guess — only extract what's explicitly given."""
 
 MAX_CONTACT_INFO_ATTEMPTS = 2
+
+_CONTACT_HINT_PATTERN = re.compile(
+    r"\b(my name'?s|my name is|i'?m|this is|call me|you can call me|"
+    r"my number is|my phone( number)? is|contact me at|reach me at)\b"
+    r"|\+?\d[\d\s\-().]{7,}\d"
+)
 
 
 def _tokenize(text: str) -> set[str]:
@@ -50,7 +58,6 @@ def _tokenize(text: str) -> set[str]:
 
 
 def _classify_intent_keywords(question: str, history: list[ChatTurn]) -> str:
-    """Fallback used only if the LLM classification call fails."""
     tokens = _tokenize(question)
     booking_score = len(tokens & _BOOKING_KEYWORDS)
     knowledge_score = len(tokens & _KNOWLEDGE_KEYWORDS)
@@ -68,9 +75,6 @@ def _classify_intent_keywords(question: str, history: list[ChatTurn]) -> str:
 
 
 class OrchestratorService:
-    """Drop-in replacement for the old single-prompt AgentService — same
-    public shape (`answer`, `preview_system_prompt`) so app/api/routes/chat.py
-    barely has to change, but internally it's a router over three agents."""
 
     def __init__(
         self, db: Session, browser_id: str | None = None, customer: Customer | None = None
@@ -82,14 +86,10 @@ class OrchestratorService:
         self.llm = get_llm_service()
 
     def preview_system_prompt(self) -> str:
-        """Used by the admin's "preview system prompt" screen. Shows the
-        Booking Agent's prompt, since it's the most detailed of the two —
-        the Knowledge Agent's prompt follows the same DB-first pattern."""
         return BookingAgent(self.db, self.browser_id, self.customer).system_prompt()
 
-    # --- Intent routing ---
 
-    def _classify_intent(self, question: str, history: list[ChatTurn]) -> str:
+    def _classify_turn(self, question: str, history: list[ChatTurn]) -> tuple[bool, str]:
         context_lines = [f"{turn.role}: {turn.content}" for turn in history[-6:]]
         context = "\n".join(context_lines)
         user_prompt = (
@@ -98,18 +98,17 @@ class OrchestratorService:
             else f"Latest message: {question}"
         )
         try:
-            raw = self.llm.generate(_INTENT_SYSTEM_PROMPT, user_prompt, max_tokens=5, temperature=0)
-            cleaned = (raw or "").strip().lower()
-            if "booking" in cleaned:
-                return "booking"
-            if "knowledge" in cleaned:
-                return "knowledge"
-            logger.warning("Intent classifier returned unexpected output %r; falling back", raw)
+            raw = self.llm.generate(_TURN_CLASSIFIER_SYSTEM_PROMPT, user_prompt, max_tokens=25, temperature=0)
+            data = json.loads(raw)
+            escalate = bool(data.get("escalate"))
+            intent = data.get("intent")
+            if intent not in ("booking", "knowledge"):
+                intent = _classify_intent_keywords(question, history)
+            return escalate, intent
         except Exception:  # noqa: BLE001 - never let routing crash the turn
-            logger.exception("LLM intent classification failed; falling back to keyword routing")
-        return _classify_intent_keywords(question, history)
+            logger.exception("LLM turn classification failed; falling back to keyword routing")
+            return False, _classify_intent_keywords(question, history)
 
-    # --- Contact-info extraction (used only while gating an escalation) ---
 
     def _extract_contact_info(self, message: str) -> tuple[str | None, str | None]:
         try:
@@ -135,6 +134,25 @@ class OrchestratorService:
             missing.append("phone")
         return missing
 
+    def _maybe_capture_contact_info(self, question: str) -> None:
+        if self.customer is None:
+            return
+        if not self._missing_contact_fields():
+            return
+        if not _CONTACT_HINT_PATTERN.search(question.lower()):
+            return
+
+        name, phone = self._extract_contact_info(question)
+        changed = False
+        if name and not (self.customer.name or "").strip():
+            self.customer.name = name
+            changed = True
+        if phone and not (self.customer.phone or "").strip():
+            self.customer.phone = phone
+            changed = True
+        if changed:
+            self.db.commit()
+
     # --- Escalation / ticket flow ---
 
     def _handle_already_escalated(
@@ -149,9 +167,6 @@ class OrchestratorService:
         if ticket is not None:
             tickets.append_message(ticket, "user", question)
             tickets.append_message(ticket, "assistant", reply, agent="support")
-        # Whatever the route already wrote to chat_messages for this turn
-        # (and anything stray from before) is now archived above — keep
-        # the live table empty for ticketed sessions.
         self.db.query(ChatMessage).filter(ChatMessage.session_id == session.id).delete()
         session.updated_at = datetime.utcnow()
         self.db.commit()
@@ -251,11 +266,17 @@ class OrchestratorService:
             return self._handle_pending_escalation(question, session, sessions, tickets, persist)
 
         reason = self.support.check_message(question) or self.support.check_streak(session)
+
+        intent = None
+        if not reason:
+            escalate, intent = self._classify_turn(question, history)
+            if escalate:
+                reason = "Customer indicated they want a human, or showed clear frustration (LLM-detected)."
+
         if reason:
             return self._start_escalation(reason, session, sessions, tickets, persist)
 
-        # Route to the responsible agent.
-        intent = self._classify_intent(question, history)
+        self._maybe_capture_contact_info(question)
         history_dicts = [{"role": t.role, "content": t.content} for t in history]
 
         if intent == "booking":

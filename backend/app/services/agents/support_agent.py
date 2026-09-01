@@ -7,13 +7,16 @@ _EXPLICIT_PATTERNS = [
     r"\bspeak (to|with) (the |a |an )?(human|person|agent|someone|somebody|staff|team|representative|manager)\b",
     r"\breal (human|person)\b",
     r"\bcustomer (service|support)\b",
-    r"\bconnect me (to|with)\b",
+    r"\bconnect me\b",
     r"\btransfer me\b",
     r"\bhuman (agent|support|help)\b",
     r"\bcan i (talk|speak) to (the |a |an )?(someone|somebody|person|human|agent|staff|manager)\b",
     r"\bi (need|want|would like) to (talk|speak) (to|with) (the |a |an )?(someone|somebody|person|human|agent|staff|manager)\b",
     r"\bthis (bot|chatbot|ai) (is|isn'?t|not) (helping|working|useful)\b",
     r"\bi want a (manager|supervisor)\b",
+    r"\braise (a |the )?(support )?ticket\b",
+    r"\b(open|create|file) a (support )?ticket\b",
+    r"\bescalate (this|it)\b",
 ]
 
 _FRUSTRATION_PATTERNS = [
@@ -24,6 +27,9 @@ _FRUSTRATION_PATTERNS = [
     r"\bwaste of (my )?time\b",
     r"\bnever mind,? forget it\b",
     r"\bi give up\b",
+    r"\byou'?re (shit|useless|stupid|garbage|terrible|awful|rubbish|dumb)\b",
+    r"\b(this is )?(shit|nonsense|rubbish|garbage)\b",
+    r"\b(idiot|stupid|dumb) (bot|chatbot|ai|assistant)\b",
 ]
 
 UNRESOLVED_STREAK_THRESHOLD = 2
@@ -38,7 +44,6 @@ class SupportAgent:
     agent_name = "support"
 
     def check_message(self, question: str) -> str | None:
-       
         if _matches_any(_EXPLICIT_PATTERNS, question):
             return "Customer explicitly asked to speak with a human."
         if _matches_any(_FRUSTRATION_PATTERNS, question):
@@ -46,7 +51,6 @@ class SupportAgent:
         return None
 
     def check_streak(self, session: ChatSession) -> str | None:
-       
         if session.unresolved_streak >= UNRESOLVED_STREAK_THRESHOLD:
             return (
                 f"Assistant could not resolve the request after "

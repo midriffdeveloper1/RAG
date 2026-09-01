@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
-import { deleteConversation, getConversation, resolveConversation } from "../../services/adminApi.js";
-import { AlertCircle, Trash2 } from "../common/Icons.jsx";
+import {
+  deleteConversation,
+  getConversation,
+  reopenConversation,
+  resolveConversation,
+} from "../../services/adminApi.js";
+import { AlertCircle, CheckCircle2, Trash2 } from "../common/Icons.jsx";
 import Modal from "../common/Modal.jsx";
 import { LoadingState, Spinner } from "../common/Spinner.jsx";
 
@@ -18,7 +23,7 @@ export default function ConversationModal({ sessionId, onClose, onResolved, onDe
   const [session, setSession] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isResolving, setIsResolving] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
@@ -40,7 +45,7 @@ export default function ConversationModal({ sessionId, onClose, onResolved, onDe
   }, [sessionId]);
 
   async function handleResolve() {
-    setIsResolving(true);
+    setIsUpdatingStatus(true);
     try {
       const updated = await resolveConversation(sessionId);
       setSession((prev) =>
@@ -48,7 +53,20 @@ export default function ConversationModal({ sessionId, onClose, onResolved, onDe
       );
       onResolved?.();
     } finally {
-      setIsResolving(false);
+      setIsUpdatingStatus(false);
+    }
+  }
+
+  async function handleReopen() {
+    setIsUpdatingStatus(true);
+    try {
+      const updated = await reopenConversation(sessionId);
+      setSession((prev) =>
+        prev ? { ...prev, needs_human: updated.needs_human, resolved_at: updated.resolved_at } : prev
+      );
+      onResolved?.();
+    } finally {
+      setIsUpdatingStatus(false);
     }
   }
 
@@ -71,15 +89,45 @@ export default function ConversationModal({ sessionId, onClose, onResolved, onDe
 
       {session && !isLoading && !error && (
         <div className="conversation-modal">
+          {(session.customer_name || session.customer_phone || session.customer_email) && (
+            <div className="conversation-modal__contact">
+              {session.customer_name && <strong>{session.customer_name}</strong>}
+              {session.customer_phone && (
+                <a href={`tel:${session.customer_phone}`}>{session.customer_phone}</a>
+              )}
+              {session.customer_email && (
+                <a href={`mailto:${session.customer_email}`}>{session.customer_email}</a>
+              )}
+            </div>
+          )}
+
           {session.ticket_number && (
-            <p className="settings-form__hint" style={{ margin: 0 }}>
-              Ticket <strong>{session.ticket_number}</strong>
-              {session.needs_human
-                ? " \u2014 open"
-                : session.resolved_at
-                ? ` \u2014 resolved ${formatDateTime(session.resolved_at)}`
-                : " \u2014 resolved"}
-            </p>
+            <div className="conversation-modal__ticket-bar">
+              <span>
+                Ticket <strong>{session.ticket_number}</strong>
+              </span>
+              {session.needs_human ? (
+                <button
+                  type="button"
+                  className="catalog-section__add-btn"
+                  onClick={handleResolve}
+                  disabled={isUpdatingStatus}
+                >
+                  {isUpdatingStatus ? <Spinner size={13} className="spinner--on-dark" /> : <CheckCircle2 size={14} />}
+                  {isUpdatingStatus ? "Updating…" : "Mark resolved"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="chat-sidebar__ticket-submit"
+                  onClick={handleReopen}
+                  disabled={isUpdatingStatus}
+                >
+                  {isUpdatingStatus ? <Spinner size={13} className="spinner--on-dark" /> : null}
+                  {isUpdatingStatus ? "Updating…" : "Reopen"}
+                </button>
+              )}
+            </div>
           )}
 
           {session.needs_human && (
@@ -94,18 +142,12 @@ export default function ConversationModal({ sessionId, onClose, onResolved, onDe
                   </p>
                 )}
               </div>
-              <button type="button" className="catalog-section__add-btn" onClick={handleResolve} disabled={isResolving}>
-                {isResolving && <Spinner size={13} className="spinner--on-dark" />}
-                {isResolving ? "Resolving…" : "Mark resolved"}
-              </button>
             </div>
           )}
 
-          {(session.customer_name || session.customer_phone || session.customer_email) && (
-            <p className="settings-form__hint">
-              {[session.customer_name, session.customer_phone, session.customer_email]
-                .filter(Boolean)
-                .join(" \u00b7 ")}
+          {!session.needs_human && session.ticket_number && session.resolved_at && (
+            <p className="settings-form__hint" style={{ margin: 0 }}>
+              Resolved {formatDateTime(session.resolved_at)}
             </p>
           )}
 

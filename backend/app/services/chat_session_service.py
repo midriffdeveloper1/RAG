@@ -82,7 +82,11 @@ class ChatSessionService:
     def discard_session(self, session_id: str, browser_id: str) -> bool:
         session = (
             self.db.query(ChatSession)
-            .filter(ChatSession.id == session_id, ChatSession.browser_id == browser_id)
+            .filter(
+                ChatSession.id == session_id,
+                ChatSession.browser_id == browser_id,
+                ChatSession.hidden_from_customer.is_(False),
+            )
             .first()
         )
         if session is None:
@@ -144,6 +148,22 @@ class ChatSessionService:
             from app.services.support_ticket_service import SupportTicketService
 
             SupportTicketService(self.db).resolve(session.ticket_number)
+
+        self.db.refresh(session)
+        return session
+
+    def admin_reopen(self, session_id: str) -> ChatSession | None:
+        session = self.admin_get(session_id)
+        if session is None:
+            return None
+        session.needs_human = True
+        session.resolved_at = None
+        self.db.commit()
+
+        if session.ticket_number:
+            from app.services.support_ticket_service import SupportTicketService
+
+            SupportTicketService(self.db).reopen(session.ticket_number)
 
         self.db.refresh(session)
         return session

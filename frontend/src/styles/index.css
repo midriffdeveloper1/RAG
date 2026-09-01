@@ -2803,6 +2803,41 @@ body {
   gap: 14px;
 }
 
+.conversation-modal__contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  font-size: 13px;
+}
+
+.conversation-modal__contact strong {
+  color: var(--color-text);
+}
+
+.conversation-modal__contact a {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.conversation-modal__contact a:hover {
+  text-decoration: underline;
+}
+
+.conversation-modal__ticket-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
 .conversation-modal__alert {
   display: flex;
   align-items: flex-start;

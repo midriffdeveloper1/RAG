@@ -81,6 +81,14 @@ def resolve_conversation(session_id: str, db: Session = Depends(get_db), admin: 
     return _to_out(session)
 
 
+@router.post("/{session_id}/reopen", response_model=ChatSessionAdminOut)
+def reopen_conversation(session_id: str, db: Session = Depends(get_db), admin: Admin = Depends(get_current_admin)):
+    session = ChatSessionService(db).admin_reopen(session_id)
+    if session is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+    return _to_out(session)
+
+
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_conversation(session_id: str, db: Session = Depends(get_db), admin: Admin = Depends(get_current_admin)):
     if not ChatSessionService(db).admin_delete(session_id):

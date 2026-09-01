@@ -208,6 +208,11 @@ export async function resolveConversation(sessionId) {
   return data;
 }
 
+export async function reopenConversation(sessionId) {
+  const { data } = await apiClient.post(`/admin/conversations/${sessionId}/reopen`);
+  return data;
+}
+
 export async function deleteConversation(sessionId) {
   await apiClient.delete(`/admin/conversations/${sessionId}`);
 }

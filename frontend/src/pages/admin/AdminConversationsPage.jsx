@@ -105,7 +105,20 @@ export default function AdminConversationsPage() {
                       style={{ cursor: "pointer" }}
                     >
                       <td className="data-table__primary">{session.title || "(no message yet)"}</td>
-                      <td>{session.customer_email || "—"}</td>
+                      <td>
+                        {session.customer_name ? (
+                          <>
+                            {session.customer_name}
+                            {session.customer_phone && (
+                              <span className="settings-form__hint" style={{ display: "block", margin: 0 }}>
+                                {session.customer_phone}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          session.customer_email || "—"
+                        )}
+                      </td>
                       <td>{session.ticket_number || "—"}</td>
                       <td>
                         {session.needs_human ? (
