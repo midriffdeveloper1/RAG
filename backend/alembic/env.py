@@ -21,6 +21,9 @@ from app.models.appointment import Appointment
 from app.models.admin import Admin
 from app.models.customer import Customer
 from app.models.chat_session import ChatMessage, ChatSession
+from app.models.document import Document
+from app.models.document_chunk import DocumentChunk
+from app.models.support_ticket import SupportTicket
 
 
 load_dotenv()

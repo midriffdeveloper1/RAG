@@ -49,9 +49,17 @@ def tone_instructions(cfg: dict) -> str:
 def date_reference_table(days_ahead: int = 14) -> str:
     today = date.today()
     lines = [f"- Today is {today.strftime('%A')}, {today.isoformat()}."]
+    seen_weekdays: set[str] = set()
     for offset in range(1, days_ahead + 1):
         d = today + timedelta(days=offset)
-        label = "Tomorrow" if offset == 1 else d.strftime("%A")
+        weekday = d.strftime("%A")
+        if offset == 1:
+            label = f"Tomorrow ({weekday})"
+        elif weekday in seen_weekdays:
+            label = f"{weekday} (the following week)"
+        else:
+            label = weekday
+        seen_weekdays.add(weekday)
         lines.append(f"- {label}: {d.isoformat()}")
     return "\n".join(lines)
 

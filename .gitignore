@@ -41,6 +41,7 @@ qdrant_data/
 .DS_Store
 Thumbs.db
 qdrant/
+voice-poc/
 
 # --- Logs ---
 *.log

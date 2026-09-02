@@ -20,6 +20,17 @@ _REFERENCE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 _REFERENCE_LENGTH = 8
 
 
+def _to_ampm(hhmm: str) -> str:
+    hour, minute = (int(p) for p in hhmm.split(":"))
+    period = "AM" if hour < 12 else "PM"
+    hour12 = hour % 12 or 12
+    return f"{hour12}:{minute:02d} {period}"
+
+
+def _display_range(start_hhmm: str, end_hhmm: str) -> str:
+    return f"{_to_ampm(start_hhmm)} \u2013 {_to_ampm(end_hhmm)}"
+
+
 def generate_reference_code() -> str:
     return "APT-" + "".join(secrets.choice(_REFERENCE_ALPHABET) for _ in range(_REFERENCE_LENGTH))
 
@@ -224,7 +235,7 @@ class AppointmentService:
         step = timedelta(minutes=settings.slot_step_minutes)
         now = datetime.now()
 
-        slots: list[dict] = []
+        slots_by_time: dict[tuple[str, str], list[str]] = {}
         for staff in qualified_staff:
             busy_query = self.db.query(Appointment).filter(
                 Appointment.staff_id == staff.id,
@@ -250,22 +261,33 @@ class AppointmentService:
                     slot_start < b_end and b_start < slot_end for b_start, b_end in busy_ranges
                 )
                 if not overlaps:
-                    slots.append(
-                        {
-                            "start_time": slot_start.strftime("%H:%M"),
-                            "end_time": slot_end.strftime("%H:%M"),
-                            "staff_id": staff.id,
-                            "staff_name": staff.name,
-                        }
-                    )
+                    key = (slot_start.strftime("%H:%M"), slot_end.strftime("%H:%M"))
+                    slots_by_time.setdefault(key, []).append(staff.name)
                 cursor += step
 
-        slots.sort(key=lambda s: s["start_time"])
+        
+        distinct_times = sorted(slots_by_time.keys())
+        max_slots = 10
+        if len(distinct_times) > max_slots:
+            last_index = len(distinct_times) - 1
+            picked_indices = sorted({round(i * last_index / (max_slots - 1)) for i in range(max_slots)})
+            distinct_times = [distinct_times[i] for i in picked_indices]
+
+        slots = [
+            {
+                "start_time": start,
+                "end_time": end,
+                "display_time": _display_range(start, end),
+                "staff": slots_by_time[(start, end)],
+            }
+            for start, end in distinct_times
+        ]
+
         return {
             "service": service.name,
             "duration_minutes": duration,
             "date": str(target_date),
-            "slots": slots[:12],
+            "slots": slots,
         }
 
     # Booking
@@ -322,6 +344,9 @@ class AppointmentService:
                 "date": str(existing.appointment_date),
                 "start_time": existing.start_time.strftime("%H:%M"),
                 "end_time": existing.end_time.strftime("%H:%M"),
+                "display_time": _display_range(
+                    existing.start_time.strftime("%H:%M"), existing.end_time.strftime("%H:%M")
+                ),
                 "status": "booked",
                 "already_booked": True,
             }
@@ -343,6 +368,10 @@ class AppointmentService:
         if match is None:
             return {"error": "That slot isn't available anymore. Please pick another time."}
 
+        assigned_staff = self._get_staff(match["staff"][0])
+        if assigned_staff is None:
+            return {"error": "That slot isn't available anymore. Please pick another time."}
+
         end_time = (
             datetime.combine(target_date, start_time) + timedelta(minutes=service.duration_minutes)
         ).time()
@@ -350,7 +379,7 @@ class AppointmentService:
         appointment = Appointment(
             reference_code=self._generate_unique_reference_code(),
             service_id=service.id,
-            staff_id=match["staff_id"],
+            staff_id=assigned_staff.id,
             customer_name=customer_name.strip(),
             customer_email=customer_email.strip().lower(),
             customer_phone=customer_phone.strip(),
@@ -366,10 +395,11 @@ class AppointmentService:
         return {
             "appointment_id": appointment.reference_code,
             "service": service.name,
-            "staff": match["staff_name"],
+            "staff": assigned_staff.name,
             "date": str(target_date),
             "start_time": start_time.strftime("%H:%M"),
             "end_time": end_time.strftime("%H:%M"),
+            "display_time": _display_range(start_time.strftime("%H:%M"), end_time.strftime("%H:%M")),
             "status": "booked",
         }
 
@@ -485,10 +515,7 @@ class AppointmentService:
         return booking_result
 
     def get_details_for_customer(self, reference_code: str, customer_email: str) -> dict:
-        """Look up a single appointment by its public reference code, but only ever
-        return it if the given email matches the appointment's own record. Never
-        distinguishes "wrong ID" from "wrong email" in the error, so a guess can't be
-        used to probe whether a given reference code exists."""
+        
         if not is_valid_email(customer_email):
             return {"error": "That email address doesn't look valid."}
 
@@ -503,6 +530,9 @@ class AppointmentService:
             "date": str(appointment.appointment_date),
             "start_time": appointment.start_time.strftime("%H:%M"),
             "end_time": appointment.end_time.strftime("%H:%M"),
+            "display_time": _display_range(
+                appointment.start_time.strftime("%H:%M"), appointment.end_time.strftime("%H:%M")
+            ),
             "status": appointment.status.value,
             "customer_name": appointment.customer_name,
             "customer_email": appointment.customer_email,
@@ -512,11 +542,7 @@ class AppointmentService:
         }
 
     def list_for_customer(self, customer_email: str) -> dict:
-        """A short index only — ID, service, date, status. Deliberately does NOT
-        repeat the customer's own name/email/phone on every row (they already
-        know it, and it's not needed to pick which appointment they mean).
-        Full details for one specific appointment come from
-        get_details_for_customer() instead."""
+       
         if not is_valid_email(customer_email):
             return {"error": "That email address doesn't look valid."}
 
@@ -534,6 +560,7 @@ class AppointmentService:
                     "service": a.service.name,
                     "date": str(a.appointment_date),
                     "start_time": a.start_time.strftime("%H:%M"),
+                    "display_time": _to_ampm(a.start_time.strftime("%H:%M")),
                     "status": a.status.value,
                 }
                 for a in appointments

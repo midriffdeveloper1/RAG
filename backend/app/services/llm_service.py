@@ -16,7 +16,7 @@ class LLMService:
                 "GROQ_API_KEY is not set. Add it to backend/.env — "
                 "get a free key at https://console.groq.com/keys"
             )
-        self.client = Groq(api_key=settings.groq_api_key)
+        self.client = Groq(api_key=settings.groq_api_key, max_retries=0, timeout=20.0)
         self.model = settings.groq_model
 
     def generate(

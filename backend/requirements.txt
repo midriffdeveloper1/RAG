@@ -41,6 +41,7 @@ numpy==2.4.6
 packaging==26.3
 passlib==1.7.4
 pillow==12.3.0
+pgvector==0.3.6
 portalocker==2.10.1
 protobuf==7.35.1
 psycopg2-binary==2.9.9

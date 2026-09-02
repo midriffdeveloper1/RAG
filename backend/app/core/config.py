@@ -20,11 +20,6 @@ class Settings(BaseSettings):
     postgres_db: str = "support_agent_db"
     database_url: str | None = None  
 
-    qdrant_host: str = "localhost"
-    qdrant_port: int = 6333
-    qdrant_collection_name: str = "business_knowledge_base"
-    qdrant_api_key: str | None = None
-
     secret_key: str = "dev-secret-key-change-me-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 8  # 8 hours
@@ -66,6 +61,12 @@ class Settings(BaseSettings):
     groq_temperature: float = 0.3
     groq_max_tokens: int = 300
 
+
+    # --- Voice (Deepgram STT + TTS) ---
+    deepgram_api_key: str | None = None
+    deepgram_project_id: str | None = None
+    voice_token_ttl_seconds: int = 60
+    voice_max_call_seconds: int = 900
 
     business_name: str = " "
     business_description: str = ""
