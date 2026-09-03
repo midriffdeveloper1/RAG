@@ -3,7 +3,8 @@ from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.models.knowledge_base import FAQ, OpeningHour, Policy
+from app.models.knowledge_base import FAQ, OpeningHour, Policy, Service
+from app.models.staff import Staff
 
 _TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
 _STOPWORDS = {
@@ -21,6 +22,15 @@ HOLIDAY_KEYWORDS = {
     "holiday", "holidays", "closed", "closure", "closures", "vacation",
     "festival", "leave", "offday",
 }
+SERVICE_KEYWORDS = {
+    "service", "services", "treatment", "treatments", "offer", "offers",
+    "offering", "offerings", "menu", "package", "packages", "price", "prices",
+    "pricing", "cost", "costs", "rate", "rates",
+}
+STAFF_KEYWORDS = {
+    "staff", "stylist", "stylists", "therapist", "therapists", "team",
+    "employee", "employees", "specialist", "specialists", "barber", "barbers",
+}
 
 _WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 _WEEKDAY_TOKENS = {d.lower(): d for d in _WEEKDAY_NAMES}
@@ -32,9 +42,6 @@ def _tokenize(text: str) -> set[str]:
 
 
 def _resolve_day_query(tokens: set[str]) -> tuple[str, date | None] | None:
-    """If the question names a specific day, returns (day_of_week, exact_date).
-    exact_date is only set for "today"/"tomorrow" — a bare weekday name like
-    "Sunday" refers to the recurring weekly pattern, not one specific date."""
     for token, offset in _RELATIVE_DAY_OFFSETS.items():
         if token in tokens:
             target = date.today() + timedelta(days=offset)
@@ -55,8 +62,6 @@ class BusinessLookupService:
 
         holidays = HolidayService(self.db)
 
-        # A named holiday mentioned by title (e.g. "what about Republic Day")
-        # always takes priority — it's the most specific thing being asked.
         named = holidays.find_by_name(business.id, raw_question)
         if named is not None:
             return holidays.describe_one(named)
@@ -133,6 +138,41 @@ class BusinessLookupService:
             return None
         return f"{business.name}: {business.description}"
 
+    def _match_services(self, business, tokens: set[str], raw_question: str) -> str | None:
+        if not (tokens & SERVICE_KEYWORDS):
+            return None
+        services = (
+            self.db.query(Service)
+            .filter(Service.business_id == business.id)
+            .order_by(Service.name)
+            .all()
+        )
+        if not services:
+            return None
+        lines = []
+        for s in services[:25]:
+            bits = [s.name]
+            if s.price is not None:
+                bits.append(f"\u20b9{s.price:g}")
+            if s.duration_minutes:
+                bits.append(f"{s.duration_minutes} min")
+            lines.append(" — ".join(bits))
+        note = f"\n(+{len(services) - 25} more — ask about a specific one for details)" if len(services) > 25 else ""
+        return "Services:\n" + "\n".join(lines) + note
+
+    def _match_staff(self, business, tokens: set[str], raw_question: str) -> str | None:
+        if not (tokens & STAFF_KEYWORDS):
+            return None
+        staff = (
+            self.db.query(Staff)
+            .filter(Staff.is_active == True)  # noqa: E712
+            .order_by(Staff.name)
+            .all()
+        )
+        if not staff:
+            return None
+        return "Team: " + ", ".join(s.name for s in staff[:25])
+
     def _match_faq(self, business, tokens: set[str], raw_question: str) -> str | None:
         faqs = self.db.query(FAQ).filter(FAQ.business_id == business.id).all()
         best, best_overlap = None, 0
@@ -172,6 +212,8 @@ class BusinessLookupService:
             self._match_holidays,
             self._match_address,
             self._match_contact,
+            self._match_services,
+            self._match_staff,
             self._match_faq,
             self._match_policy,
             self._match_about,

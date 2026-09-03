@@ -46,22 +46,18 @@ def tone_instructions(cfg: dict) -> str:
     return text
 
 
-def date_reference_table(days_ahead: int = 14) -> str:
+def date_reference_table(days_ahead: int = 8) -> str:
     today = date.today()
-    lines = [f"- Today is {today.strftime('%A')}, {today.isoformat()}."]
+    lines = [f"Today={today.strftime('%a')} {today.isoformat()}", f"Tomorrow={(today + timedelta(days=1)).isoformat()}"]
     seen_weekdays: set[str] = set()
-    for offset in range(1, days_ahead + 1):
+    for offset in range(2, days_ahead + 1):
         d = today + timedelta(days=offset)
-        weekday = d.strftime("%A")
-        if offset == 1:
-            label = f"Tomorrow ({weekday})"
-        elif weekday in seen_weekdays:
-            label = f"{weekday} (the following week)"
-        else:
-            label = weekday
+        weekday = d.strftime("%a")
+        if weekday in seen_weekdays:
+            continue
         seen_weekdays.add(weekday)
-        lines.append(f"- {label}: {d.isoformat()}")
-    return "\n".join(lines)
+        lines.append(f"{weekday}={d.isoformat()}")
+    return " | ".join(lines)
 
 
 def customer_context(customer: Customer | None) -> str:

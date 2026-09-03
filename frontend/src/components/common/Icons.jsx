@@ -1,7 +1,3 @@
-/**
- * A small, dependency-free icon set (no external icon library required).
- * Every icon accepts `size` and `className` and forwards any other svg props.
- */
 const base = {
   fill: "none",
   stroke: "currentColor",
@@ -397,6 +393,15 @@ export function PhoneOff(props) {
     <Svg {...props}>
       <path d="M10.7 6.3a16 16 0 0 1 3.8 2.2M14.5 14.5a16 16 0 0 1-4.5-3M5 5l14 14" />
       <path d="M3.3 8.1a17 17 0 0 0 3.7 5.6 17 17 0 0 0 5.6 3.7l2.5-2.5a1.5 1.5 0 0 1 1.6-.3 12 12 0 0 0 3.2.5 1.5 1.5 0 0 1 1.5 1.5V20a1.5 1.5 0 0 1-1.5 1.5A17.5 17.5 0 0 1 2.5 4 1.5 1.5 0 0 1 4 2.5h2.6A1.5 1.5 0 0 1 8.1 4a12 12 0 0 0 .5 3.2 1.5 1.5 0 0 1-.3 1.6z" />
+    </Svg>
+  );
+}
+
+export function PhoneCall(props) {
+  return (
+    <Svg {...props}>
+      <path d="M3.3 8.1a17 17 0 0 0 3.7 5.6 17 17 0 0 0 5.6 3.7l2.5-2.5a1.5 1.5 0 0 1 1.6-.3 12 12 0 0 0 3.2.5 1.5 1.5 0 0 1 1.5 1.5V20a1.5 1.5 0 0 1-1.5 1.5A17.5 17.5 0 0 1 2.5 4 1.5 1.5 0 0 1 4 2.5h2.6A1.5 1.5 0 0 1 8.1 4a12 12 0 0 0 .5 3.2 1.5 1.5 0 0 1-.3 1.6z" />
+      <path d="M15 3c1.6.3 2.9 1.6 3.2 3.2M15 6.5c.8.2 1.4.8 1.6 1.6" />
     </Svg>
   );
 }

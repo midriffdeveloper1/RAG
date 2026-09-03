@@ -1,5 +1,3 @@
-from datetime import date
-
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -19,10 +17,9 @@ settings = get_settings()
 SYSTEM_PROMPT_TEMPLATE = """[ROLE] You are the Booking Agent for {business_name}'s front-desk assistant - a {business_description}. You handle availability, booking, rescheduling, cancelling, and looking up appointments. For general questions about the business itself (pricing philosophy, policies, FAQs, "are you open on X"), just answer naturally as the assistant - don't say you're bringing in anyone else or mention any internal agent/system name, and don't guess; the system routes that kind of question for you behind the scenes.
 [TONE - Admin>Chatbot Config, "{tone}"] {tone_instructions}
 [CUSTOMER] {customer_context}
-[DATES] Today is {today_label}. The table below is the ONLY source of truth for dates - never compute, guess, or count days yourself, even for something that seems simple like "tomorrow" or "next Thursday". To resolve what the customer said: find the matching line below (by weekday name, or "Tomorrow") and copy that exact YYYY-MM-DD next to it - never a date that isn't listed. If a weekday name appears twice, "next"/"this coming"/an unqualified weekday name always means the FIRST (soonest) one; only use the one marked "(the following week)" if they clearly say "the week after" or similar. Before you state a date or weekday to the customer, double check it against this table - never let the date and the weekday name you say disagree with each other.
+[DATES] The table below is the ONLY source of truth for dates — never compute, guess, or count days yourself, even for "tomorrow". Format: Weekday=YYYY-MM-DD, pipe-separated, each weekday listed once (its next occurrence). Match the customer's day to an entry and copy that exact date. If a day they ask about isn't listed (past the window shown), say you can only check within it.
 {date_reference_table}
-(If a requested day isn't listed (2+ weeks out), say you can only check within this window.)
-Currency: INR (Rs.). Times: always show times to the customer in 12-hour clock with AM/PM (e.g. "9:00 AM", "7:00 PM"), never 24-hour ("19:00") - tool results already come formatted this way, so just relay them as given rather than converting anything yourself.
+Currency: INR (Rs.). Times: always 12-hour with AM/PM (e.g. "9:00 AM") — tool results already come formatted this way, so relay them as given, never convert.
 
 [TOOLS] list_services, check_available_slots, book_appointment, reschedule_appointment, cancel_appointment, check_customer_appointments, get_appointment_by_id, update_appointment_contact, update_customer_profile, delete_customer_profile. When you genuinely need more than one of these before you can respond (e.g. confirming a service's real name AND checking its slots, or looking up an appointment by ID which needs check_customer_appointments then get_appointment_by_id), request them together in the same turn instead of one at a time - it gets the customer their answer faster.
 
@@ -225,14 +222,12 @@ class BookingAgent(ToolCallingAgent):
         cfg = admin_config(self.db)
         self._fallback_message = cfg["fallback_message"]
         reply_budget = max(20, cfg["reply_word_budget"] - 20)
-        today = date.today()
         return SYSTEM_PROMPT_TEMPLATE.format(
             business_name=cfg["business_name"],
             business_description=cfg["business_description"],
             tone=cfg["tone"],
             tone_instructions=tone_instructions(cfg),
             customer_context=customer_context(self.customer),
-            today_label=f"{today.strftime('%A')}, {today.isoformat()}",
             date_reference_table=date_reference_table(),
             cancellation_window_hours=settings.cancellation_window_hours,
             reply_word_budget=f"{reply_budget}-{cfg['reply_word_budget']}",

@@ -1,7 +1,6 @@
 const STT_SAMPLE_RATE = 16000;
 const TTS_SAMPLE_RATE = 24000;
 
-/** Downsamples a Float32 audio buffer to 16-bit PCM at the target rate. */
 function floatTo16BitPCM(float32Array, inputSampleRate, targetSampleRate) {
   const ratio = inputSampleRate / targetSampleRate;
   const outLength = Math.floor(float32Array.length / ratio);
@@ -20,6 +19,7 @@ export async function startMicCapture(onPCMFrame) {
   const audioContext = new (window.AudioContext || window.webkitAudioContext)();
   const source = audioContext.createMediaStreamSource(stream);
 
+  
   const bufferSize = 4096;
   const processor = audioContext.createScriptProcessor(bufferSize, 1, 1);
 
@@ -40,12 +40,18 @@ export async function startMicCapture(onPCMFrame) {
   };
 }
 
-export function connectSTT(streamConfig, token, { onPartial, onFinal, onSpeechStarted, onError }) {
+export function connectSTT(streamConfig, token, { onPartial, onFinal, onSpeechStarted, onError, onOpen }) {
   const url = new URL(streamConfig.url);
   Object.entries(streamConfig.params || {}).forEach(([key, value]) => url.searchParams.set(key, value));
 
-  const socket = new WebSocket(url.toString(), ["token", token]);
+  const socket = new WebSocket(url.toString(), ["bearer", token]);
   socket.binaryType = "arraybuffer";
+
+  let opened = false;
+  socket.onopen = () => {
+    opened = true;
+    onOpen?.();
+  };
 
   socket.onmessage = (event) => {
     let message;
@@ -71,20 +77,30 @@ export function connectSTT(streamConfig, token, { onPartial, onFinal, onSpeechSt
     }
   };
 
-  socket.onerror = (event) => onError?.(event);
+  socket.onerror = (event) => onError?.(event, opened);
+  socket.onclose = (event) => {
+    if (!opened || (event.code !== 1000 && event.code !== 1005)) {
+      onError?.(event, opened);
+    }
+  };
 
   return socket;
 }
 
-/** Opens a Deepgram streaming TTS connection and plays audio as it arrives. */
-export function connectTTS(streamConfig, token, { onAudioStarted, onAudioCompleted, onError }) {
+export function connectTTS(streamConfig, token, { onAudioStarted, onAudioCompleted, onError, onOpen }) {
   const url = new URL(streamConfig.url);
   Object.entries(streamConfig.params || {}).forEach(([key, value]) => url.searchParams.set(key, value));
 
-  const socket = new WebSocket(url.toString(), ["token", token]);
+  const socket = new WebSocket(url.toString(), ["bearer", token]);
   socket.binaryType = "arraybuffer";
 
   const playback = new PCMPlaybackQueue(TTS_SAMPLE_RATE, onAudioStarted, onAudioCompleted);
+
+  let opened = false;
+  socket.onopen = () => {
+    opened = true;
+    onOpen?.();
+  };
 
   socket.onmessage = (event) => {
     if (typeof event.data === "string") {
@@ -95,11 +111,17 @@ export function connectTTS(streamConfig, token, { onAudioStarted, onAudioComplet
     playback.enqueue(event.data);
   };
 
-  socket.onerror = (event) => onError?.(event);
+  socket.onerror = (event) => onError?.(event, opened);
+  socket.onclose = (event) => {
+    if (!opened || (event.code !== 1000 && event.code !== 1005)) {
+      onError?.(event, opened);
+    }
+  };
 
   return { socket, playback };
 }
 
+/** Schedules incoming 16-bit PCM chunks for gapless, low-latency playback. */
 class PCMPlaybackQueue {
   constructor(sampleRate, onStarted, onCompleted) {
     this.sampleRate = sampleRate;

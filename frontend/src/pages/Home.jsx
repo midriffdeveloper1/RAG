@@ -60,7 +60,6 @@ export default function Home() {
 
       <div className="home-page__chat-area">
         <ChatWidget
-          key={activeSessionId || "new"}
           sessionId={activeSessionId}
           customerEmail={customer?.email}
           onSessionCreated={handleSessionCreated}

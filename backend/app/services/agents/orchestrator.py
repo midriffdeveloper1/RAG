@@ -1,4 +1,3 @@
-import json
 import logging
 import re
 from datetime import datetime
@@ -31,27 +30,13 @@ _KNOWLEDGE_KEYWORDS = {
     "holiday", "holidays", "service", "services", "about", "who",
 }
 
-_TURN_CLASSIFIER_SYSTEM_PROMPT = """You are a routing classifier in front of a salon's chat assistant. Look at the customer's LATEST message, using the conversation for context, and decide two things:
+_TURN_CLASSIFIER_SYSTEM_PROMPT = """Routing classifier for a salon assistant. Given the latest customer message (with context), output JSON:
+{"escalate": true|false, "intent": "booking"|"knowledge"}
+escalate=true only if they clearly ask for a human/manager/ticket, or show real anger/frustration (not mild "no"). intent="booking" for availability/booking/reschedule/cancel/their own appointment; else "knowledge". Fill intent either way. JSON only."""
 
-1. escalate — true if the customer is clearly asking to speak with a human/agent/manager/support, asking to "raise a ticket" or be "connected" to someone, or is expressing real frustration, anger, sarcasm, or insults directed at the assistant (not just a neutral "no" or mild disagreement). This should catch it regardless of exact phrasing, typos, or how it's worded — use your judgement the way a person reading the message would. False otherwise.
-2. intent — "booking" (checking availability, booking, rescheduling, cancelling, or anything about their own appointment/profile) or "knowledge" (services, pricing, hours, holidays/closures, policies, FAQs, location, contact details). Only meaningful when escalate is false — still fill it in either way.
+_HUMANIZE_SYSTEM_PROMPT = """You're {business_name}'s front-desk assistant, texting a customer. Reword the given fact briefly and naturally, like a real person would — no markdown tables, no internal jargon. If it's a repetitive pattern (e.g. the same hours across several days), summarize it in one sentence instead of listing each day. If it's a list of distinct items (e.g. services with prices, staff names), keep it as a short clean list — don't compress away the actual items customers need to choose from. Never add/remove/change facts. Vary phrasing. Don't mention "the database" or that you're rephrasing."""
 
-Reply with EXACTLY this JSON shape and nothing else — no markdown, no code fences, no explanation, just the raw JSON object on its own:
-{"escalate": true or false, "intent": "booking" or "knowledge"}"""
-
-_HUMANIZE_SYSTEM_PROMPT = """You're the front-desk assistant for {business_name}, replying to a customer in a live chat. You've been given a fact to convey — rephrase it briefly and naturally, the way a real person texting back would, not someone reading off a printout.
-
-Rules:
-- 1-2 short sentences for a simple fact. No markdown tables, no line-by-line charts — if the fact lists several similar items (e.g. hours that are the same most days), summarize the pattern in a sentence instead of listing each one.
-- Never add, remove, or change any fact — only reword what's given, faithfully.
-- Vary your phrasing — don't default to the same sentence structure every time.
-- Don't mention that you're rephrasing anything, or reference "the database" — just answer naturally, as if you already knew this."""
-
-_CONTACT_EXTRACTION_SYSTEM_PROMPT = """Extract a customer's name and phone number from their message, if present.
-
-Reply with EXACTLY this JSON shape and nothing else — no markdown, no explanation:
-{"name": "<name or null>", "phone": "<phone or null>"}
-Use JSON null (not the text "null") for anything not clearly stated. Do not guess — only extract what's explicitly given."""
+_CONTACT_EXTRACTION_SYSTEM_PROMPT = """Extract name and phone from the message, if present. JSON only: {"name": "<name or null>", "phone": "<phone or null>"}. Use null for anything not clearly stated — never guess."""
 
 _PHONE_PATTERN = re.compile(r"\+?\d[\d\-\s().]{7,14}\d")
 _NAME_STRIP_PATTERN = re.compile(
@@ -59,7 +44,6 @@ _NAME_STRIP_PATTERN = re.compile(
     r"phone( number)? is|number is|reach me at|contact me at|and|is|the|at)\b",
     re.IGNORECASE,
 )
-_JSON_OBJECT_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
 
 MAX_CONTACT_INFO_ATTEMPTS = 2
 
@@ -115,11 +99,6 @@ def _regex_extract_contact_info(message: str) -> tuple[str | None, str | None]:
     return name, phone
 
 
-def _extract_json_object(raw: str) -> str:
-    match = _JSON_OBJECT_PATTERN.search(raw)
-    return match.group(0) if match else raw
-
-
 def _looks_complete(text: str) -> bool:
     return text.rstrip().endswith((".", "!", "?", '"', "'", ")", "]", ":"))
 
@@ -169,14 +148,13 @@ class OrchestratorService:
             else f"Latest message: {question}"
         )
         try:
-            raw = self.llm.generate(_TURN_CLASSIFIER_SYSTEM_PROMPT, user_prompt, max_tokens=40, temperature=0)
-            data = json.loads(_extract_json_object(raw))
+            data = self.llm.generate_json(_TURN_CLASSIFIER_SYSTEM_PROMPT, user_prompt, max_tokens=60, temperature=0)
             escalate = bool(data.get("escalate"))
             intent = data.get("intent")
             if intent not in ("booking", "knowledge"):
                 intent = _classify_intent_keywords(question, history)
             return escalate, intent
-        except Exception:  
+        except Exception:
             logger.exception("LLM turn classification failed; falling back to keyword routing")
             return False, _classify_intent_keywords(question, history)
 
@@ -186,8 +164,7 @@ class OrchestratorService:
             return name, phone
 
         try:
-            raw = self.llm.generate(_CONTACT_EXTRACTION_SYSTEM_PROMPT, message, max_tokens=60, temperature=0)
-            data = json.loads(_extract_json_object(raw))
+            data = self.llm.generate_json(_CONTACT_EXTRACTION_SYSTEM_PROMPT, message, max_tokens=60, temperature=0)
 
             def _clean(value):
                 if not isinstance(value, str):

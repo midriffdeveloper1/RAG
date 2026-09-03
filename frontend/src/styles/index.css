@@ -670,6 +670,29 @@ body {
   cursor: not-allowed;
 }
 
+.voice-call--idle {
+  align-items: center;
+  padding: 22px 16px;
+}
+
+.voice-call__start-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 22px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.voice-call__start-btn:hover {
+  background: var(--color-primary-dark);
+}
+
 .chat-message__channel-icon {
   margin-right: 6px;
   font-size: 12px;

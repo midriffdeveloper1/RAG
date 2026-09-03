@@ -60,7 +60,6 @@ class KnowledgeAgent(ToolCallingAgent):
         self._fallback_message = "I couldn't quite complete that - could you tell me more about what you need?"
 
     def system_prompt(self) -> str:
-        print("+++++++++++++++++++++++++++++++++++++++++++Knowledge++++++++++++++++++++++++++++++++++++++++++++++++")
         cfg = admin_config(self.db)
         self._fallback_message = cfg["fallback_message"]
         reply_budget = max(20, cfg["reply_word_budget"] - 20)

@@ -16,6 +16,7 @@ export const VOICE_CALL_STATE = {
 };
 
 const SENTENCE_END = /[.!?]\s*$/;
+const SOCKET_OPEN_TIMEOUT_MS = 8000;
 
 function toWsUrl(relativePath) {
   const apiBase = new URL(
@@ -23,12 +24,21 @@ function toWsUrl(relativePath) {
     window.location.origin
   );
   const wsProtocol = apiBase.protocol === "https:" ? "wss:" : "ws:";
-  // relativePath already includes the /api/v1 prefix from the backend, so
-  // resolve it against the API host, not against the full base (which would
-  // double up the prefix).
   return `${wsProtocol}//${apiBase.host}${relativePath}`;
 }
 
+function waitForOpen(attachOpenCallback, label) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out connecting`)), SOCKET_OPEN_TIMEOUT_MS);
+    attachOpenCallback(() => {
+      clearTimeout(timer);
+      resolve();
+    }, (event, wasOpened) => {
+      clearTimeout(timer);
+      reject(new Error(`${label} failed${wasOpened ? " (dropped)" : " (couldn't connect)"}`));
+    });
+  });
+}
 
 export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreated }) {
   const [callState, setCallStateRaw] = useState(VOICE_CALL_STATE.IDLE);
@@ -118,15 +128,11 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
           if (!event.data?.recoverable) setCallState(VOICE_CALL_STATE.ERROR);
           break;
 
-        case "call.ended":
-          setCallState(VOICE_CALL_STATE.ENDED);
-          break;
-
         default:
           break;
       }
     },
-    [chat, speakSentence]
+    [chat, speakSentence, setCallState]
   );
 
   const startCall = useCallback(async () => {
@@ -141,7 +147,7 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
         err.response?.status === 403
           ? "Voice calling isn't enabled for this business yet."
           : err.response?.status === 503
-            ? "Voice calling isn't configured yet — ask an admin to set the Deepgram keys."
+            ? "Voice calling isn't configured yet — ask an admin to set the Deepgram key."
             : "Couldn't start the call. Please try again.";
       setError(message);
       setCallState(VOICE_CALL_STATE.ERROR);
@@ -158,17 +164,18 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
       controlUrl.searchParams.set("browser_id", getBrowserId());
       const controlSocket = new WebSocket(controlUrl.toString());
       controlSocketRef.current = controlSocket;
-
       controlSocket.onmessage = (evt) => handleControlEvent(JSON.parse(evt.data));
-      controlSocket.onerror = () => {
-        setError("The call connection dropped. Please try again.");
-        setCallState(VOICE_CALL_STATE.ERROR);
-      };
 
-      await new Promise((resolve, reject) => {
-        controlSocket.onopen = resolve;
-        controlSocket.addEventListener("error", reject, { once: true });
-      });
+      await waitForOpen(
+        (onOpen, onFail) => {
+          controlSocket.onopen = onOpen;
+          controlSocket.onerror = () => onFail(null, false);
+          controlSocket.onclose = (e) => {
+            if (e.code !== 1000) onFail(null, false);
+          };
+        },
+        "Call connection"
+      );
 
       const sttSocket = connectSTT(session.stt, session.deepgram_token, {
         onPartial: (text) => {
@@ -196,25 +203,36 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
           }
         },
         onSpeechStarted: () => {
-          // Barge-in: a new user turn always wins over stale assistant audio.
           if (ttsRef.current?.playback) {
             ttsRef.current.playback.interrupt();
           }
           if (callStateRef.current === VOICE_CALL_STATE.SPEAKING) {
             setCallState(VOICE_CALL_STATE.INTERRUPTED);
-          } else {
+          } else if (callStateRef.current !== VOICE_CALL_STATE.PROCESSING) {
             setCallState(VOICE_CALL_STATE.LISTENING);
           }
         },
-        onError: () => setError("Speech recognition hiccuped — please keep talking."),
+        onError: () => {
+          setError("Speech recognition connection dropped. Try ending and starting the call again.");
+          setCallState(VOICE_CALL_STATE.ERROR);
+        },
       });
       sttSocketRef.current = sttSocket;
 
       ttsRef.current = connectTTS(session.tts, session.deepgram_token, {
         onAudioStarted: () => setCallState(VOICE_CALL_STATE.SPEAKING),
         onAudioCompleted: () => setCallState(VOICE_CALL_STATE.LISTENING),
-        onError: () => setError("Voice playback hiccuped."),
+        onError: () => {
+          // Non-fatal: text is still live even if speech playback drops.
+          setError("Voice playback dropped, but the chat is still live — replies will still appear as text.");
+        },
       });
+
+      await Promise.all([
+        waitForOpen((onOpen, onFail) => {
+          sttSocket.addEventListener("open", onOpen, { once: true });
+        }, "Microphone connection"),
+      ]);
 
       stopMicRef.current = await startMicCapture((pcmFrame) => {
         if (sttSocket.readyState === WebSocket.OPEN) sttSocket.send(pcmFrame);
@@ -225,12 +243,12 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
       const message =
         err?.name === "NotAllowedError"
           ? "Microphone access was denied. Please allow it to start a voice call."
-          : "Couldn't connect the call. Please try again.";
+          : err?.message || "Couldn't connect the call. Please try again.";
       setError(message);
       setCallState(VOICE_CALL_STATE.ERROR);
       cleanup();
     }
-  }, [sessionId, customerEmail, chat, onSessionCreated, handleControlEvent, cleanup]);
+  }, [sessionId, customerEmail, chat, onSessionCreated, handleControlEvent, cleanup, setCallState]);
 
   const endCall = useCallback(() => {
     try {
@@ -240,8 +258,7 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
     }
     cleanup();
     setCallState(VOICE_CALL_STATE.IDLE);
-    chat.refresh();
-  }, [cleanup, chat]);
+  }, [cleanup, setCallState]);
 
   return { callState, error, startCall, endCall };
 }
