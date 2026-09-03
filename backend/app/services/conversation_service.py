@@ -13,15 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 class ConversationService:
-    """Single entry point for turning a user message into an assistant reply.
-
-    This is the "Conversation Layer" both Chat and Voice sit on top of — it
-    owns session lookup/creation, the email-onboarding gate, and handing the
-    turn to OrchestratorService. Chat and Voice must never diverge here: the
-    channel argument only affects how the turn is *labelled* when persisted,
-    never which agents/RAG/tools run.
-    """
-
     def __init__(self, db: Session) -> None:
         self.db = db
         self.sessions = ChatSessionService(db)

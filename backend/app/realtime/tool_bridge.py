@@ -19,17 +19,7 @@ FRIENDLY_ERROR_MESSAGE = (
 
 
 def _chunk_for_delta(text: str) -> Iterator[str]:
-    """Split finalized text into small pieces for progressive UI rendering.
-
-    Note: the underlying LLM call in the tool-calling loop isn't itself
-    token-streamed (the loop needs the complete tool_call payload before it
-    can dispatch a tool), so this replays the *finished* answer in small
-    pieces rather than true token-by-token generation. Sentence boundaries
-    are preserved so the TTS layer (fed sentence-by-sentence by the
-    frontend) can start speaking the first sentence while later ones are
-    still "arriving" in the transcript — the actual latency win comes from
-    that per-sentence TTS kickoff, not from this chunking itself.
-    """
+    
     for sentence in _SENTENCE_SPLIT.split(text.strip()):
         if not sentence:
             continue
@@ -45,11 +35,7 @@ def stream_turn(
     transcript: str,
     customer_email: str | None = None,
 ) -> Iterator[RealtimeEvent]:
-    """Run one voice turn through the exact same conversation layer as chat.
-
-    Yields normalized events only — never raw provider payloads — so the
-    frontend and any future speech provider stay decoupled from each other.
-    """
+   
     conversation = ConversationService(db)
 
     yield RealtimeEvent(type=RealtimeEventType.ASSISTANT_RESPONSE_STARTED)
@@ -71,10 +57,7 @@ def stream_turn(
         return
 
     if response.agent == "booking":
-        # Coarse-grained: the booking agent may have run several tool calls
-        # internally (list_services, check_available_slots, book_appointment,
-        # ...). We surface that a tool ran without leaking which ones or
-        # their arguments — that detail stays server-side.
+        
         yield RealtimeEvent(type=RealtimeEventType.TOOL_CALL_STARTED, data={"agent": "booking"})
         yield RealtimeEvent(type=RealtimeEventType.TOOL_CALL_COMPLETED, data={"agent": "booking"})
 

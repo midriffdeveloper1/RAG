@@ -32,15 +32,6 @@ class DeepgramVoiceProvider(RealtimeVoiceProvider):
         self._api_key = settings.deepgram_api_key
 
     def create_ephemeral_token(self, ttl_seconds: int = 60) -> dict[str, Any]:
-        """Mint a short-lived, browser-safe Deepgram JWT for this call.
-
-        Uses Deepgram's token-based auth endpoint (POST /v1/auth/grant),
-        which only requires the server-side key to have "Member" (or
-        higher) permission — unlike the key-management endpoint
-        (POST /v1/projects/{id}/keys), which needs a keys:write-scoped key
-        and a project id. The permanent DEEPGRAM_API_KEY never leaves the
-        server either way.
-        """
         ttl = max(_MIN_TTL_SECONDS, min(ttl_seconds, _MAX_TTL_SECONDS))
         headers = {"Authorization": f"Token {self._api_key}"}
 

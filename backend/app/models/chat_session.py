@@ -27,12 +27,7 @@ class ChatSession(Base):
     awaiting_contact_info: Mapped[bool] = mapped_column(Boolean, default=False)
     unresolved_streak: Mapped[int] = mapped_column(default=0)
 
-    # "chat" | "voice" — which channel this conversation started on. A voice
-    # call and a chat session share the exact same orchestrator/agents; this
-    # only marks provenance for the timeline UI and analytics.
     channel: Mapped[str] = mapped_column(String(10), default="chat")
-    # Set for the duration of a live voice call, cleared when it ends. Lets
-    # the realtime layer look up the owning conversation by call id.
     voice_session_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

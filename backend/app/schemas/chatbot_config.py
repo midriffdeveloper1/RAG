@@ -2,8 +2,6 @@ from pydantic import BaseModel, Field
 
 TONE_OPTIONS = ["friendly", "professional", "casual", "formal", "playful", "empathetic"]
 
-# A representative subset of Deepgram Aura-2 voices. The admin can type any
-# other valid Aura voice id too — this list just powers a convenient dropdown.
 VOICE_NAME_OPTIONS = [
     "aura-asteria-en",  # warm, friendly (default)
     "aura-luna-en",     # calm, approachable

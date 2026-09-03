@@ -1,11 +1,3 @@
-"""Normalized realtime voice event model.
-
-The frontend and the FastAPI voice layer only ever exchange events shaped
-like this — never provider-specific payloads. This is what makes the
-realtime provider (currently Deepgram) swappable later without touching the
-frontend or the orchestrator integration: only app/realtime/*_provider.py
-would need to change.
-"""
 import enum
 from datetime import datetime, timezone
 from typing import Any

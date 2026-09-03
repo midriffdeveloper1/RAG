@@ -7,14 +7,6 @@ from app.services.chat_session_service import ChatSessionService
 
 
 class VoiceSessionService:
-    """Binds a live voice call to the same ChatSession used by chat.
-
-    A call keeps `voice_session_id` set for its duration so the WebSocket
-    handler can look the conversation back up (e.g. on reconnect); it's
-    cleared when the call ends. The conversation_id returned to the client
-    *is* the ChatSession id — the same id chat already uses — so a customer
-    could in principle continue the same conversation by chat afterwards.
-    """
 
     def __init__(self, db: Session) -> None:
         self.db = db
