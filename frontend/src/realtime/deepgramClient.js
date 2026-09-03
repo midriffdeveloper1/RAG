@@ -1,11 +1,3 @@
-/**
- * Direct-to-Deepgram audio plumbing. Nothing here talks to our backend —
- * it only ever uses the short-lived token from POST /voice/session. Business
- * logic, tool calls, and RAG all happen server-side over the separate
- * control-plane WebSocket (see useVoiceSession.js); this file is strictly
- * "microphone in, speech out".
- */
-
 const STT_SAMPLE_RATE = 16000;
 const TTS_SAMPLE_RATE = 24000;
 
@@ -22,18 +14,12 @@ function floatTo16BitPCM(float32Array, inputSampleRate, targetSampleRate) {
   return out;
 }
 
-/**
- * Captures the microphone and streams 16-bit PCM frames to a callback.
- * Returns a stop() function that releases the mic and audio graph.
- */
+
 export async function startMicCapture(onPCMFrame) {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   const audioContext = new (window.AudioContext || window.webkitAudioContext)();
   const source = audioContext.createMediaStreamSource(stream);
 
-  // ScriptProcessorNode is deprecated but universally supported and simple
-  // for a bursty PCM-frame use case like this; an AudioWorklet would avoid
-  // the deprecation but adds a build-time worklet file for marginal gain here.
   const bufferSize = 4096;
   const processor = audioContext.createScriptProcessor(bufferSize, 1, 1);
 
@@ -54,11 +40,6 @@ export async function startMicCapture(onPCMFrame) {
   };
 }
 
-/**
- * Opens a Deepgram streaming STT connection. Deepgram's browser auth
- * convention is passing the token as a websocket subprotocol
- * (["token", <token>]) since browsers can't set custom auth headers on WS.
- */
 export function connectSTT(streamConfig, token, { onPartial, onFinal, onSpeechStarted, onError }) {
   const url = new URL(streamConfig.url);
   Object.entries(streamConfig.params || {}).forEach(([key, value]) => url.searchParams.set(key, value));
@@ -119,7 +100,6 @@ export function connectTTS(streamConfig, token, { onAudioStarted, onAudioComplet
   return { socket, playback };
 }
 
-/** Schedules incoming 16-bit PCM chunks for gapless, low-latency playback. */
 class PCMPlaybackQueue {
   constructor(sampleRate, onStarted, onCompleted) {
     this.sampleRate = sampleRate;
@@ -167,7 +147,6 @@ class PCMPlaybackQueue {
     }, delay + 50);
   }
 
-  /** Barge-in: immediately stop whatever's currently playing/queued. */
   interrupt() {
     this.activeSources.forEach((source) => {
       try {

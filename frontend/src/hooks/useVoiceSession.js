@@ -29,12 +29,7 @@ function toWsUrl(relativePath) {
   return `${wsProtocol}//${apiBase.host}${relativePath}`;
 }
 
-/**
- * Runs one voice call. `chat` is the object returned by useChat for the same
- * conversation — the voice layer writes into the exact same message
- * timeline (via appendMessage/updateMessage) rather than keeping its own,
- * so Chat and Voice always show one unified transcript.
- */
+
 export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreated }) {
   const [callState, setCallStateRaw] = useState(VOICE_CALL_STATE.IDLE);
   const [error, setError] = useState(null);
@@ -158,8 +153,6 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
     }
 
     try {
-      // Control-plane socket: carries only the finalized transcript and the
-      // normalized text/tool/error events coming back — never raw audio.
       const controlUrl = new URL(toWsUrl(session.ws_url));
       controlUrl.searchParams.set("voice_session_id", session.voice_session_id);
       controlUrl.searchParams.set("browser_id", getBrowserId());
@@ -177,8 +170,6 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
         controlSocket.addEventListener("error", reject, { once: true });
       });
 
-      // Speech-to-text: direct browser -> Deepgram, authenticated with the
-      // short-lived token only.
       const sttSocket = connectSTT(session.stt, session.deepgram_token, {
         onPartial: (text) => {
           if (!userMessageIdRef.current) {
@@ -219,7 +210,6 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
       });
       sttSocketRef.current = sttSocket;
 
-      // Text-to-speech: direct browser <- Deepgram, same ephemeral token.
       ttsRef.current = connectTTS(session.tts, session.deepgram_token, {
         onAudioStarted: () => setCallState(VOICE_CALL_STATE.SPEAKING),
         onAudioCompleted: () => setCallState(VOICE_CALL_STATE.LISTENING),

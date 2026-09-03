@@ -63,13 +63,7 @@ async def voice_events_ws(
     browser_id: str,
     db: Session = Depends(get_db),
 ):
-    """Control-plane events only — no raw audio ever crosses this socket.
 
-    The browser talks to Deepgram directly (via the ephemeral token from
-    POST /voice/session) for microphone audio and speech playback. This
-    socket exists purely to hand finalized transcripts to the same
-    Orchestrator chat uses, and to stream back normalized text/tool events.
-    """
     voice_sessions = VoiceSessionService(db)
     session = voice_sessions.get_active_call(session_id, voice_session_id)
     if session is None or session.browser_id != browser_id:
@@ -99,11 +93,6 @@ async def voice_events_ws(
 
             elif event_type == "call.end":
                 break
-
-            # user.speech.started / stopped and partial transcripts are
-            # UI-only signals from the Deepgram STT connection the frontend
-            # already has open directly; the backend doesn't need to see
-            # them to do its job, so anything else is simply ignored.
 
     except WebSocketDisconnect:
         logger.info("Voice WebSocket disconnected for session_id=%s", session_id)
