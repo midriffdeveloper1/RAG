@@ -64,7 +64,8 @@ class Settings(BaseSettings):
 
     # --- Voice (Deepgram STT + TTS) ---
     deepgram_api_key: str | None = None
-    deepgram_project_id: str | None = None
+    # How long a browser-issued token is valid for. Kept short since it's
+    # exposed client-side; the browser requests a fresh one per call.
     voice_token_ttl_seconds: int = 60
     voice_max_call_seconds: int = 900
 

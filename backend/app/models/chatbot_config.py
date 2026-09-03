@@ -41,6 +41,15 @@ class ChatbotConfig(Base):
     enable_email_gate: Mapped[bool] = mapped_column(Boolean, default=True)
     show_suggested_questions: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    # --- Voice call (Task 4) ---
+    voice_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Deepgram TTS model/voice id, e.g. "aura-asteria-en". Kept as a plain
+    # string (not an enum) so new voices can be offered without a migration.
+    voice_name: Mapped[str] = mapped_column(String(60), default="aura-asteria-en")
+    # Optional override spoken at the start of a call; falls back to
+    # greeting_message when unset.
+    voice_greeting_message: Mapped[str] = mapped_column(Text, nullable=True)
+
     suggested_questions: Mapped[str] = mapped_column(
         Text,
         default=(

@@ -7,10 +7,8 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.schemas.chat import ChatRequest, ChatResponse
-from app.services.agents.orchestrator import OrchestratorService
 from app.services.chat_session_service import ChatSessionService
-from app.services.customer_service import CustomerService
-from app.services.onboarding_service import OnboardingService
+from app.services.conversation_service import ConversationService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Chat"])
@@ -33,50 +31,17 @@ def _purge_stale_sessions_task() -> None:
 def chat_endpoint(payload: ChatRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     background_tasks.add_task(_purge_stale_sessions_task)
 
-    sessions = ChatSessionService(db)
-    session = sessions.get_or_create(payload.browser_id, payload.session_id)
-
-    if payload.customer_email:
-        current_email = session.customer.email if session.customer_id else None
-        if current_email != payload.customer_email.strip().lower():
-            result = CustomerService(db).identify(payload.customer_email)
-            if "error" not in result:
-                session.customer_id = result["customer"]["id"]
-                db.commit()
-
-    if session.customer_id is None:
-        is_first_turn = not sessions.get_history(session.id, max_exchanges=1)
-        onboarding = OnboardingService(db)
-        result = onboarding.handle(payload.question, session, payload.browser_id, is_first_turn)
-        db.commit()
-
-        sessions.append_message(session, "user", payload.question)
-
-        answer = result.reply
-        follow_up = None
-        if result.identified and result.remainder and len(result.remainder) > 3:
-            try:
-                orchestrator = OrchestratorService(db, browser_id=payload.browser_id, customer=session.customer)
-                follow_up = orchestrator.answer(result.remainder, session, [], persist=False)
-                answer = f"{answer}\n\n{follow_up.answer}"
-            except (RuntimeError, GroqError):
-                pass  
-
-        sessions.append_message(session, "assistant", answer)
-        return ChatResponse(
-            answer=answer,
-            sources=[],
-            session_id=session.id,
-            needs_human=bool(follow_up and follow_up.needs_human),
-            ticket_number=follow_up.ticket_number if follow_up else None,
-        )
-
-    history = sessions.get_history(session.id, settings.max_history_exchanges)
-    sessions.append_message(session, "user", payload.question)
+    conversation = ConversationService(db)
+    session = conversation.get_or_create_session(payload.browser_id, payload.session_id, channel="chat")
 
     try:
-        orchestrator = OrchestratorService(db, browser_id=payload.browser_id, customer=session.customer)
-        response = orchestrator.answer(payload.question, session, history)
+        return conversation.handle_turn(
+            payload.question,
+            session,
+            browser_id=payload.browser_id,
+            customer_email=payload.customer_email,
+            channel="chat",
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
     except GroqError as exc:
@@ -85,6 +50,3 @@ def chat_endpoint(payload: ChatRequest, background_tasks: BackgroundTasks, db: S
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="The assistant is temporarily unavailable. Please try again shortly.",
         )
-
-    response.session_id = session.id
-    return response

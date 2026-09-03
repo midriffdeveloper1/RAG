@@ -380,3 +380,23 @@ export function ToggleRight(props) {
     </Svg>
   );
 }
+
+export function Mic(props) {
+  return (
+    <Svg {...props}>
+      <rect x="9" y="2" width="6" height="12" rx="3" />
+      <path d="M5 10a7 7 0 0 0 14 0" />
+      <line x1="12" y1="19" x2="12" y2="22" />
+      <line x1="8" y1="22" x2="16" y2="22" />
+    </Svg>
+  );
+}
+
+export function PhoneOff(props) {
+  return (
+    <Svg {...props}>
+      <path d="M10.7 6.3a16 16 0 0 1 3.8 2.2M14.5 14.5a16 16 0 0 1-4.5-3M5 5l14 14" />
+      <path d="M3.3 8.1a17 17 0 0 0 3.7 5.6 17 17 0 0 0 5.6 3.7l2.5-2.5a1.5 1.5 0 0 1 1.6-.3 12 12 0 0 0 3.2.5 1.5 1.5 0 0 1 1.5 1.5V20a1.5 1.5 0 0 1-1.5 1.5A17.5 17.5 0 0 1 2.5 4 1.5 1.5 0 0 1 4 2.5h2.6A1.5 1.5 0 0 1 8.1 4a12 12 0 0 0 .5 3.2 1.5 1.5 0 0 1-.3 1.6z" />
+    </Svg>
+  );
+}

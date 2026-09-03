@@ -2,6 +2,16 @@ from pydantic import BaseModel, Field
 
 TONE_OPTIONS = ["friendly", "professional", "casual", "formal", "playful", "empathetic"]
 
+# A representative subset of Deepgram Aura-2 voices. The admin can type any
+# other valid Aura voice id too — this list just powers a convenient dropdown.
+VOICE_NAME_OPTIONS = [
+    "aura-asteria-en",  # warm, friendly (default)
+    "aura-luna-en",     # calm, approachable
+    "aura-stella-en",   # upbeat, clear
+    "aura-orion-en",    # confident, male
+    "aura-arcas-en",    # casual, male
+]
+
 
 class ChatbotConfigOut(BaseModel):
     widget_title: str
@@ -20,6 +30,9 @@ class ChatbotConfigOut(BaseModel):
     enable_email_gate: bool
     show_suggested_questions: bool
     suggested_questions: list[str] = []
+    voice_enabled: bool
+    voice_name: str
+    voice_greeting_message: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -41,3 +54,6 @@ class ChatbotConfigUpdate(BaseModel):
     enable_email_gate: bool | None = None
     show_suggested_questions: bool | None = None
     suggested_questions: list[str] | None = None
+    voice_enabled: bool | None = None
+    voice_name: str | None = Field(default=None, max_length=60)
+    voice_greeting_message: str | None = None

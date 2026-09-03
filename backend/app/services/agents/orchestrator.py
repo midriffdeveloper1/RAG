@@ -11,6 +11,7 @@ from app.schemas.chat import ChatResponse, ChatTurn
 from app.services.agents.booking_agent import BookingAgent
 from app.services.agents.knowledge_agent import KnowledgeAgent
 from app.services.agents.support_agent import SupportAgent
+from app.services.business_lookup_service import BusinessLookupService
 from app.services.chat_session_service import ChatSessionService
 from app.services.llm_service import get_llm_service
 from app.services.support_ticket_service import SupportTicketService
@@ -35,8 +36,16 @@ _TURN_CLASSIFIER_SYSTEM_PROMPT = """You are a routing classifier in front of a s
 1. escalate — true if the customer is clearly asking to speak with a human/agent/manager/support, asking to "raise a ticket" or be "connected" to someone, or is expressing real frustration, anger, sarcasm, or insults directed at the assistant (not just a neutral "no" or mild disagreement). This should catch it regardless of exact phrasing, typos, or how it's worded — use your judgement the way a person reading the message would. False otherwise.
 2. intent — "booking" (checking availability, booking, rescheduling, cancelling, or anything about their own appointment/profile) or "knowledge" (services, pricing, hours, holidays/closures, policies, FAQs, location, contact details). Only meaningful when escalate is false — still fill it in either way.
 
-Reply with EXACTLY this JSON shape and nothing else — no markdown, no explanation:
+Reply with EXACTLY this JSON shape and nothing else — no markdown, no code fences, no explanation, just the raw JSON object on its own:
 {"escalate": true or false, "intent": "booking" or "knowledge"}"""
+
+_HUMANIZE_SYSTEM_PROMPT = """You're the front-desk assistant for {business_name}, replying to a customer in a live chat. You've been given a fact to convey — rephrase it briefly and naturally, the way a real person texting back would, not someone reading off a printout.
+
+Rules:
+- 1-2 short sentences for a simple fact. No markdown tables, no line-by-line charts — if the fact lists several similar items (e.g. hours that are the same most days), summarize the pattern in a sentence instead of listing each one.
+- Never add, remove, or change any fact — only reword what's given, faithfully.
+- Vary your phrasing — don't default to the same sentence structure every time.
+- Don't mention that you're rephrasing anything, or reference "the database" — just answer naturally, as if you already knew this."""
 
 _CONTACT_EXTRACTION_SYSTEM_PROMPT = """Extract a customer's name and phone number from their message, if present.
 
@@ -59,6 +68,26 @@ _CONTACT_HINT_PATTERN = re.compile(
     r"my number is|my phone( number)? is|contact me at|reach me at)\b"
     r"|\+?\d[\d\s\-().]{7,}\d"
 )
+
+_NEEDS_LLM_REVIEW_PATTERN = re.compile(
+    r"[!?]{2,}|\b(no+t?|why not|ugh+|hate|angry|annoyed|frustrat\w*|shit|"
+    r"stupid|idiot|useless|garbage|nonsense|rubbish|dumb|terrible|awful|"
+    r"worst|connect|ticket|human|person|manager|supervisor)\b",
+    re.IGNORECASE,
+)
+
+
+def _fast_route_intent(question: str) -> str | None:
+    if _NEEDS_LLM_REVIEW_PATTERN.search(question):
+        return None
+    tokens = _tokenize(question)
+    booking_score = len(tokens & _BOOKING_KEYWORDS)
+    knowledge_score = len(tokens & _KNOWLEDGE_KEYWORDS)
+    if booking_score >= 1 and booking_score > knowledge_score:
+        return "booking"
+    if knowledge_score >= 1 and knowledge_score > booking_score:
+        return "knowledge"
+    return None
 
 
 def _tokenize(text: str) -> set[str]:
@@ -91,8 +120,11 @@ def _extract_json_object(raw: str) -> str:
     return match.group(0) if match else raw
 
 
+def _looks_complete(text: str) -> bool:
+    return text.rstrip().endswith((".", "!", "?", '"', "'", ")", "]", ":"))
+
+
 def _classify_intent_keywords(question: str, history: list[ChatTurn]) -> str:
-    """Fallback used only if the LLM classification call fails."""
     tokens = _tokenize(question)
     booking_score = len(tokens & _BOOKING_KEYWORDS)
     knowledge_score = len(tokens & _KNOWLEDGE_KEYWORDS)
@@ -110,20 +142,23 @@ def _classify_intent_keywords(question: str, history: list[ChatTurn]) -> str:
 
 
 class OrchestratorService:
-
+    
     def __init__(
-        self, db: Session, browser_id: str | None = None, customer: Customer | None = None
+        self,
+        db: Session,
+        browser_id: str | None = None,
+        customer: Customer | None = None,
+        channel: str = "chat",
     ) -> None:
         self.db = db
         self.browser_id = browser_id
         self.customer = customer
+        self.channel = channel
         self.support = SupportAgent()
         self.llm = get_llm_service()
 
     def preview_system_prompt(self) -> str:
-        return BookingAgent(self.db, self.browser_id, self.customer).system_prompt()
-
-    # --- Turn classification: escalate? + which agent? (one combined LLM call) ---
+       return BookingAgent(self.db, self.browser_id, self.customer).system_prompt()
 
     def _classify_turn(self, question: str, history: list[ChatTurn]) -> tuple[bool, str]:
         context_lines = [f"{turn.role}: {turn.content}" for turn in history[-6:]]
@@ -134,17 +169,16 @@ class OrchestratorService:
             else f"Latest message: {question}"
         )
         try:
-            raw = self.llm.generate(_TURN_CLASSIFIER_SYSTEM_PROMPT, user_prompt, max_tokens=25, temperature=0)
-            data = json.loads(raw)
+            raw = self.llm.generate(_TURN_CLASSIFIER_SYSTEM_PROMPT, user_prompt, max_tokens=40, temperature=0)
+            data = json.loads(_extract_json_object(raw))
             escalate = bool(data.get("escalate"))
             intent = data.get("intent")
             if intent not in ("booking", "knowledge"):
                 intent = _classify_intent_keywords(question, history)
             return escalate, intent
-        except Exception:  # noqa: BLE001 - never let routing crash the turn
+        except Exception:  
             logger.exception("LLM turn classification failed; falling back to keyword routing")
             return False, _classify_intent_keywords(question, history)
-
 
     def _extract_contact_info(self, message: str) -> tuple[str | None, str | None]:
         name, phone = _regex_extract_contact_info(message)
@@ -201,9 +235,10 @@ class OrchestratorService:
         self, question: str, session: ChatSession, tickets: SupportTicketService
     ) -> ChatResponse:
         reply = (
-            f"Your ticket {session.ticket_number} is already with our team \u2014 no need to keep "
-            "chatting here, they'll follow up with you directly. Let me know if there's anything "
-            "else I can help with while you wait."
+            f"Thank you for your message. Your ticket {session.ticket_number} has already been "
+            "raised, and our support team will review this chat shortly. If you have another "
+            "question in the meantime, please feel free to start a new chat \u2014 thank you for "
+            "your patience!"
         )
         ticket = tickets.get_by_ticket_number(session.ticket_number)
         if ticket is not None:
@@ -247,7 +282,7 @@ class OrchestratorService:
                 "reach you directly?"
             )
             if persist:
-                sessions.append_message(session, "assistant", message, agent="support")
+                sessions.append_message(session, "assistant", message, agent="support", channel=self.channel, message_type="assistant_text")
             return ChatResponse(
                 answer=message, sources=[], session_id=session.id, needs_human=False, agent="support",
             )
@@ -273,7 +308,6 @@ class OrchestratorService:
         if missing:
             session.unresolved_streak += 1
             if session.unresolved_streak >= MAX_CONTACT_INFO_ATTEMPTS:
-                # Don't loop forever asking — raise the ticket with whatever we have.
                 self.db.commit()
                 return self._finalize_escalation(
                     session.escalation_reason or "Customer requested human assistance.",
@@ -283,7 +317,7 @@ class OrchestratorService:
             ask = " and ".join(missing)
             message = f"Thanks \u2014 I still need your {ask} so our team can follow up. Could you share that?"
             if persist:
-                sessions.append_message(session, "assistant", message, agent="support")
+                sessions.append_message(session, "assistant", message, agent="support", channel=self.channel, message_type="assistant_text")
             return ChatResponse(
                 answer=message, sources=[], session_id=session.id, needs_human=False, agent="support",
             )
@@ -294,6 +328,31 @@ class OrchestratorService:
         )
 
     # --- Main entry point ---
+
+    def _try_fast_knowledge_answer(self, question: str) -> str | None:
+        from app.models.knowledge_base import Business
+
+        business = self.db.query(Business).first()
+        if business is None:
+            return None
+        return BusinessLookupService(self.db).answer(business, question)
+
+    def _humanize_fast_answer(self, raw_answer: str) -> str:
+        from app.models.knowledge_base import Business
+
+        business = self.db.query(Business).first()
+        business_name = (business.name if business and business.name else None) or "the business"
+        system_prompt = _HUMANIZE_SYSTEM_PROMPT.format(business_name=business_name)
+        try:
+            rephrased = self.llm.generate(system_prompt, raw_answer, max_tokens=120, temperature=0.7)
+            rephrased = (rephrased or "").strip()
+            if rephrased and _looks_complete(rephrased):
+                return rephrased
+            if rephrased:
+                logger.warning("Humanized answer looked truncated, using raw database text: %r", rephrased)
+        except Exception: 
+            logger.exception("Fast-path answer humanization failed; using raw database text")
+        return raw_answer
 
     def answer(
         self, question: str, session: ChatSession, history: list[ChatTurn], persist: bool = True
@@ -308,16 +367,32 @@ class OrchestratorService:
             return self._handle_pending_escalation(question, session, sessions, tickets, persist)
 
         reason = self.support.check_message(question) or self.support.check_streak(session)
-
         intent = None
         if not reason:
+            intent = _fast_route_intent(question)
+
+        if not reason and intent is None:
             escalate, intent = self._classify_turn(question, history)
             if escalate:
                 reason = "Customer indicated they want a human, or showed clear frustration (LLM-detected)."
 
+        if not reason and intent == "knowledge":
+            fast_answer = self._try_fast_knowledge_answer(question)
+            if fast_answer:
+                fast_answer = self._humanize_fast_answer(fast_answer)
+                self._maybe_capture_contact_info(question)
+                session.unresolved_streak = 0
+                self.db.commit()
+                if persist:
+                    sessions.append_message(session, "assistant", fast_answer, agent="knowledge", channel=self.channel, message_type="assistant_text")
+                return ChatResponse(
+                    answer=fast_answer, sources=[], session_id=session.id, needs_human=False, agent="knowledge",
+                )
+
         if reason:
             return self._start_escalation(reason, session, sessions, tickets, persist)
 
+        # Route to the responsible agent.
         self._maybe_capture_contact_info(question)
         history_dicts = [{"role": t.role, "content": t.content} for t in history]
 
@@ -332,7 +407,7 @@ class OrchestratorService:
         self.db.commit()
 
         if persist:
-            sessions.append_message(session, "assistant", reply.answer, agent=reply.agent)
+            sessions.append_message(session, "assistant", reply.answer, agent=reply.agent, channel=self.channel, message_type="assistant_text")
 
         return ChatResponse(
             answer=reply.answer, sources=[], session_id=session.id, needs_human=False, agent=reply.agent,

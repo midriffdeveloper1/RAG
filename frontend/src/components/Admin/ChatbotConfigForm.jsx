@@ -5,6 +5,14 @@ import { LoadingState, Spinner } from "../common/Spinner.jsx";
 
 const TONE_OPTIONS = ["friendly", "professional", "casual", "formal", "playful", "empathetic"];
 
+const VOICE_NAME_OPTIONS = [
+  { value: "aura-asteria-en", label: "Asteria — warm, friendly (default)" },
+  { value: "aura-luna-en", label: "Luna — calm, approachable" },
+  { value: "aura-stella-en", label: "Stella — upbeat, clear" },
+  { value: "aura-orion-en", label: "Orion — confident (male)" },
+  { value: "aura-arcas-en", label: "Arcas — casual (male)" },
+];
+
 export default function ChatbotConfigForm() {
   const [form, setForm] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -195,6 +203,58 @@ export default function ChatbotConfigForm() {
             </label>
           ))}
         </div>
+      </div>
+
+      <div className="settings-form__section">
+        <h2>Voice call</h2>
+        <p className="settings-form__hint">
+          Lets customers talk to the assistant out loud instead of typing. Voice reuses the
+          exact same orchestrator, agents, and knowledge base as chat — this only controls the
+          call experience itself.
+        </p>
+        <div className="settings-toggle-grid">
+          <label className="settings-toggle">
+            <input
+              type="checkbox"
+              checked={form.voice_enabled}
+              onChange={(e) => update("voice_enabled", e.target.checked)}
+            />
+            <span className="settings-toggle__track" aria-hidden="true" />
+            Enable voice calling
+          </label>
+        </div>
+        <div className="settings-form__grid">
+          <label className="settings-form__field">
+            Assistant voice
+            <select
+              value={form.voice_name}
+              onChange={(e) => update("voice_name", e.target.value)}
+              disabled={!form.voice_enabled}
+            >
+              {VOICE_NAME_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="settings-form__field settings-form__field--wide">
+            Voice call greeting (optional — falls back to the greeting message above)
+            <textarea
+              rows={2}
+              placeholder="e.g. Hi, thanks for calling — how can I help today?"
+              value={form.voice_greeting_message || ""}
+              onChange={(e) => update("voice_greeting_message", e.target.value)}
+              disabled={!form.voice_enabled}
+            />
+          </label>
+        </div>
+        {form.voice_enabled && (
+          <p className="settings-form__hint">
+            Requires <code>DEEPGRAM_API_KEY</code> and <code>DEEPGRAM_PROJECT_ID</code> to be set
+            in the backend environment — ask your developer if calls fail to connect.
+          </p>
+        )}
       </div>
 
       <div className="settings-form__section">

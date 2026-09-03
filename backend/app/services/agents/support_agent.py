@@ -62,6 +62,7 @@ class SupportAgent:
         return (
             "I've flagged this conversation for our team so a person can take it from here — "
             f"they'll follow up with you directly. Your ticket number is {ticket_number} — you "
-            "can check its status any time from the panel at the bottom of the sidebar. Thanks "
+            "can check its status any time from the panel at the bottom of the sidebar. If you "
+            "have another question in the meantime, please feel free to start a new chat. Thanks "
             "for your patience!"
         )

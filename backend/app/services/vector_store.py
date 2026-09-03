@@ -39,6 +39,16 @@ def _keyword_overlap_score(query_terms: set[str], text_value: str) -> float:
 
 
 class VectorStoreService:
+    """pgvector-backed store for document chunk embeddings.
+
+    Public interface mirrors the previous Qdrant implementation
+    (ensure_collection, upsert_document_chunks, delete_by_document_id, search)
+    so callers (RAGService, DocumentService) require no changes.
+
+    Each operation opens its own short-lived session rather than holding one
+    on the (cached, shared-across-requests) service instance, since a
+    SQLAlchemy Session is not safe to share across concurrent requests.
+    """
 
     def __init__(self) -> None:
         self.embedder = get_embedding_service()
@@ -53,6 +63,9 @@ class VectorStoreService:
             db.close()
 
     def ensure_collection(self) -> None:
+        # The pgvector extension is normally created by the alembic migration.
+        # This is a cheap, once-per-process safety net for environments where
+        # migrations haven't been run yet (e.g. first-time local setup).
         if self._extension_checked:
             return
         with self._session() as db:

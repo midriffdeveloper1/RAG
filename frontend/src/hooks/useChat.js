@@ -19,22 +19,31 @@ export function useChat(sessionId, customerEmail, { onSessionCreated } = {}) {
     liveSessionIdRef.current = sessionId;
   }, [sessionId]);
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     if (!sessionId || !customerEmail) {
       setMessages([WELCOME_MESSAGE]);
       return;
     }
     setIsLoadingHistory(true);
     setError(null);
-    getChatSession(sessionId, customerEmail)
+    return getChatSession(sessionId, customerEmail)
       .then((session) => {
         setMessages(
-          session.messages.map((m, i) => ({ id: `${sessionId}-${i}`, role: m.role, content: m.content }))
+          session.messages.map((m, i) => ({
+            id: `${sessionId}-${i}`,
+            role: m.role,
+            content: m.content,
+            channel: m.channel,
+          }))
         );
       })
       .catch(() => setError("Couldn't load that conversation."))
       .finally(() => setIsLoadingHistory(false));
   }, [sessionId, customerEmail]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   
   useEffect(() => {
@@ -85,5 +94,26 @@ export function useChat(sessionId, customerEmail, { onSessionCreated } = {}) {
     [sessionId, customerEmail, onSessionCreated]
   );
 
-  return { messages, isLoading: isSending, isLoadingHistory, error, sendMessage };
+  /** Appends a message immediately (used by the voice layer for live turns). */
+  const appendMessage = useCallback((role, content, extra = {}) => {
+    const id = crypto.randomUUID();
+    setMessages((prev) => [...prev, { id, role, content, ...extra }]);
+    return id;
+  }, []);
+
+  /** Updates an already-appended message's content in place, by id. */
+  const updateMessage = useCallback((id, content) => {
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, content } : m)));
+  }, []);
+
+  return {
+    messages,
+    isLoading: isSending,
+    isLoadingHistory,
+    error,
+    sendMessage,
+    refresh,
+    appendMessage,
+    updateMessage,
+  };
 }

@@ -75,3 +75,17 @@ export async function getTicketStatus(ticketNumber) {
   const { data } = await apiClient.get(`/support/tickets/${encodeURIComponent(ticketNumber)}`);
   return data;
 }
+
+export async function startVoiceSession({ sessionId, customerEmail }) {
+  const { data } = await apiClient.post("/voice/session", {
+    browser_id: getBrowserId(),
+    session_id: sessionId || null,
+    customer_email: customerEmail || null,
+  });
+  return data;
+}
+
+export async function getPublicChatbotConfig() {
+  const { data } = await apiClient.get("/chatbot-config");
+  return data;
+}

@@ -4,6 +4,7 @@ import { MESSAGE_ROLE } from "../../utils/constants.js";
 
 export default function ChatMessage({ message }) {
   const isUser = message.role === MESSAGE_ROLE.USER;
+  const isVoice = message.channel === "voice";
 
   return (
     <div
@@ -14,6 +15,11 @@ export default function ChatMessage({ message }) {
       }`}
     >
       <div className="chat-message__bubble">
+        {isVoice && (
+          <span className="chat-message__channel-icon" aria-label={isUser ? "Said by voice" : "Spoken reply"}>
+            {isUser ? "🎙" : "🔊"}
+          </span>
+        )}
         {isUser ? (
           <span>{message.content}</span>
         ) : (

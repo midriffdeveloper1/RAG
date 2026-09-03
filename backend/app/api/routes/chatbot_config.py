@@ -29,6 +29,9 @@ def _to_out(config: ChatbotConfig) -> ChatbotConfigOut:
         enable_email_gate=config.enable_email_gate,
         show_suggested_questions=config.show_suggested_questions,
         suggested_questions=config.suggested_questions_list,
+        voice_enabled=config.voice_enabled,
+        voice_name=config.voice_name,
+        voice_greeting_message=config.voice_greeting_message,
     )
 
 

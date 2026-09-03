@@ -1,5 +1,6 @@
 import logging
 from functools import lru_cache
+from typing import Iterator
 
 from groq import Groq
 
@@ -36,6 +37,34 @@ class LLMService:
             ],
         )
         return response.choices[0].message.content
+
+    def generate_stream(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> Iterator[str]:
+        """Yield response text incrementally, for progressive display/TTS.
+
+        Used by the voice layer so the assistant's text (and, downstream,
+        speech) can start rendering before the full reply is generated. Chat
+        mode doesn't need this today but can adopt it the same way.
+        """
+        stream = self.client.chat.completions.create(
+            model=self.model,
+            temperature=settings.groq_temperature if temperature is None else temperature,
+            max_tokens=settings.groq_max_tokens if max_tokens is None else max_tokens,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            stream=True,
+        )
+        for chunk in stream:
+            delta = chunk.choices[0].delta.content
+            if delta:
+                yield delta
 
     def chat(self, messages: list[dict], tools: list[dict] | None = None):
         kwargs: dict = {
