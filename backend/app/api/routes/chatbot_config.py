@@ -32,6 +32,7 @@ def _to_out(config: ChatbotConfig) -> ChatbotConfigOut:
         voice_enabled=config.voice_enabled,
         voice_name=config.voice_name,
         voice_greeting_message=config.voice_greeting_message,
+        barge_in_enabled=config.barge_in_enabled,
     )
 
 

@@ -25,8 +25,12 @@ Currency: INR (Rs.).
 6. Never mention "tools", "functions", "database", "RAG", or other internal system details to the customer — you're simply "the assistant" to them.
 7. If the request is entirely unrelated to {business_name}, politely decline and steer back.
 8. You cannot connect the customer to a human, schedule a callback, or transfer them to live chat - you have no such tool. If they're asking for that, don't claim to do it or promise someone will reach out; that only happens automatically when they clearly state they want a person, which is handled outside this conversation. Just say plainly you can't do that here and offer to keep helping directly.
+9. Dont repetely ask for name, contact again and again, sk only when it look neccessary.
+10. Dont give contact and email detail of Businesss again and again unsually if not asked.
+
 
 [FALLBACK] If you genuinely cannot help, adapt this naturally rather than reciting verbatim: "{fallback_message}"
+{voice_style}
 """
 
 TOOL_SCHEMAS = [
@@ -51,10 +55,11 @@ TOOL_SCHEMAS = [
 
 class KnowledgeAgent(ToolCallingAgent):
     agent_name = "knowledge"
-    def __init__(self, db: Session, customer=None) -> None:
+    def __init__(self, db: Session, customer=None, channel: str = "chat") -> None:
         super().__init__()
         self.db = db
         self.customer = customer
+        self.channel = channel
         self.lookup = BusinessLookupService(db)
         self.vector_store = get_vector_store()
         self._fallback_message = "I couldn't quite complete that - could you tell me more about what you need?"
@@ -63,6 +68,15 @@ class KnowledgeAgent(ToolCallingAgent):
         cfg = admin_config(self.db)
         self._fallback_message = cfg["fallback_message"]
         reply_budget = max(20, cfg["reply_word_budget"] - 20)
+        budget_label = f"{reply_budget}-{cfg['reply_word_budget']}"
+        voice_style = ""
+        if self.channel == "voice":
+            budget_label = "10-20"
+            voice_style = (
+                "\n[VOICE] This is a live spoken call, not text. One short sentence, no lists, "
+                "no bullets, no markdown. If the fact has many parts (e.g. a long services list), "
+                "mention 2-3 and ask what they're interested in rather than reading it all."
+            )
         return SYSTEM_PROMPT_TEMPLATE.format(
             business_name=cfg["business_name"],
             business_description=cfg["business_description"],
@@ -70,8 +84,9 @@ class KnowledgeAgent(ToolCallingAgent):
             tone_instructions=tone_instructions(cfg),
             customer_context=customer_context(self.customer),
             date_reference_table=date_reference_table(),
-            reply_word_budget=f"{reply_budget}-{cfg['reply_word_budget']}",
+            reply_word_budget=budget_label,
             fallback_message=cfg["fallback_message"],
+            voice_style=voice_style,
         )
 
     def tool_schemas(self) -> list[dict]:

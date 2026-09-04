@@ -37,8 +37,9 @@ Currency: INR (Rs.). Times: always 12-hour with AM/PM (e.g. "9:00 AM") — tool 
 11. You cannot connect the customer to a human, schedule a callback, or transfer them to live chat - you have no such tool. If they're asking for that, don't claim to do it or promise someone will reach out; that only happens automatically when they clearly state they want a person, which is handled outside this conversation. Just say plainly you can't do that here and offer to keep helping with their booking directly.
 12. If the customer rejects the slots you offered (wrong time of day, etc.) and that date genuinely has nothing in the window they want, don't just repeat the same list again - say plainly that date has nothing in that window (mention why if it's obvious, e.g. the service's length means it must finish before closing), and proactively ask if you should check a different date instead of waiting for them to suggest one. Never answer a rejection by re-sending the exact list you already gave.
 13. Every slot/appointment a tool returns includes a display_time field (e.g. "9:00 AM - 10:15 AM") - always show THAT to the customer, exactly as given. Never show the raw start_time/end_time (24-hour) fields, and never try to convert or compute a time yourself in either direction.
+14. If book_appointment returns "already_booked": true, this exact appointment already existed before this request - it did NOT just get created from what the customer typed this turn. Tell them plainly it's already on the books, using the tool's returned details (staff/date/time) as the actual saved state - don't present it as a fresh confirmation of what they just said, and don't imply their just-given name/phone/staff preference changed anything.
 
-[STYLE] ~{reply_word_budget} words, direct and warm, no padding. Vary phrasing. Never mention "tools", "functions", other internal system details, or any internal agent/team name — you're simply "the assistant" to the customer, and any behind-the-scenes handoff between question types should feel invisible and seamless.
+[STYLE] ~{reply_word_budget} words, direct and warm, no padding. Vary phrasing. Never mention "tools", "functions", other internal system details, or any internal agent/team name — you're simply "the assistant" to the customer, and any behind-the-scenes handoff between question types should feel invisible and seamless.{voice_style}
 [FALLBACK] If genuinely stuck, adapt this naturally rather than reciting verbatim: "{fallback_message}"
 """
 
@@ -208,7 +209,11 @@ class BookingAgent(ToolCallingAgent):
     agent_name = "booking"
 
     def __init__(
-        self, db: Session, browser_id: str | None = None, customer: Customer | None = None
+        self,
+        db: Session,
+        browser_id: str | None = None,
+        customer: Customer | None = None,
+        channel: str = "chat",
     ) -> None:
         super().__init__()
         self.db = db
@@ -216,12 +221,22 @@ class BookingAgent(ToolCallingAgent):
         self.customers = CustomerService(db)
         self.browser_id = browser_id
         self.customer = customer
+        self.channel = channel
         self._fallback_message = "I couldn't quite complete that - could you tell me more about what you need?"
 
     def system_prompt(self) -> str:
         cfg = admin_config(self.db)
         self._fallback_message = cfg["fallback_message"]
         reply_budget = max(20, cfg["reply_word_budget"] - 20)
+        budget_label = f"{reply_budget}-{cfg['reply_word_budget']}"
+        voice_style = ""
+        if self.channel == "voice":
+            budget_label = "12-25"
+            voice_style = (
+                "\n[VOICE] This is a live spoken call, not text. Talk like a real back-and-forth "
+                "conversation — one short sentence, one question or update at a time. No lists, "
+                "no bullets, no markdown, nothing that only makes sense written down."
+            )
         return SYSTEM_PROMPT_TEMPLATE.format(
             business_name=cfg["business_name"],
             business_description=cfg["business_description"],
@@ -230,8 +245,9 @@ class BookingAgent(ToolCallingAgent):
             customer_context=customer_context(self.customer),
             date_reference_table=date_reference_table(),
             cancellation_window_hours=settings.cancellation_window_hours,
-            reply_word_budget=f"{reply_budget}-{cfg['reply_word_budget']}",
+            reply_word_budget=budget_label,
             fallback_message=cfg["fallback_message"],
+            voice_style=voice_style,
         )
 
     def tool_schemas(self) -> list[dict]:

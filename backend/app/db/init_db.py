@@ -51,8 +51,8 @@ def seed_chatbot_config() -> None:
 def init_db() -> None:
     # create_tables()
     seed_admin()
-    seed_chatbot_config()
+    # seed_chatbot_config()
 
-    from app.db.seed_business import seed_business_catalog
+    # from app.db.seed_business import seed_business_catalog
 
-    seed_business_catalog()
+    # seed_business_catalog()

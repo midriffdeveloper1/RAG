@@ -21,4 +21,5 @@ def get_public_chatbot_config(db: Session = Depends(get_db)):
         "show_suggested_questions": config.show_suggested_questions,
         "suggested_questions": config.suggested_questions_list,
         "voice_enabled": config.voice_enabled,
+        "barge_in_enabled": config.barge_in_enabled,
     }

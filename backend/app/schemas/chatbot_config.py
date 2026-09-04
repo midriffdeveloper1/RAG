@@ -31,6 +31,7 @@ class ChatbotConfigOut(BaseModel):
     voice_enabled: bool
     voice_name: str
     voice_greeting_message: str | None = None
+    barge_in_enabled: bool
 
     model_config = {"from_attributes": True}
 
@@ -55,3 +56,4 @@ class ChatbotConfigUpdate(BaseModel):
     voice_enabled: bool | None = None
     voice_name: str | None = Field(default=None, max_length=60)
     voice_greeting_message: str | None = None
+    barge_in_enabled: bool | None = None

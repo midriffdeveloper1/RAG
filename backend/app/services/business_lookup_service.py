@@ -149,15 +149,20 @@ class BusinessLookupService:
         )
         if not services:
             return None
+        shown = services[:8]
         lines = []
-        for s in services[:25]:
+        for s in shown:
             bits = [s.name]
             if s.price is not None:
                 bits.append(f"\u20b9{s.price:g}")
             if s.duration_minutes:
                 bits.append(f"{s.duration_minutes} min")
             lines.append(" — ".join(bits))
-        note = f"\n(+{len(services) - 25} more — ask about a specific one for details)" if len(services) > 25 else ""
+        note = (
+            f"\n(+{len(services) - 8} more not shown — ask about a specific service or category)"
+            if len(services) > 8
+            else ""
+        )
         return "Services:\n" + "\n".join(lines) + note
 
     def _match_staff(self, business, tokens: set[str], raw_question: str) -> str | None:
@@ -171,7 +176,7 @@ class BusinessLookupService:
         )
         if not staff:
             return None
-        return "Team: " + ", ".join(s.name for s in staff[:25])
+        return "Team: " + ", ".join(s.name for s in staff[:12])
 
     def _match_faq(self, business, tokens: set[str], raw_question: str) -> str | None:
         faqs = self.db.query(FAQ).filter(FAQ.business_id == business.id).all()
@@ -212,8 +217,8 @@ class BusinessLookupService:
             self._match_holidays,
             self._match_address,
             self._match_contact,
-            self._match_services,
-            self._match_staff,
+            # self._match_services,
+            # self._match_staff,
             self._match_faq,
             self._match_policy,
             self._match_about,

@@ -103,6 +103,14 @@ def _looks_complete(text: str) -> bool:
     return text.rstrip().endswith((".", "!", "?", '"', "'", ")", "]", ":"))
 
 
+def _salvage_incomplete(text: str) -> str | None:
+    for cutoff in (". ", "! ", "? "):
+        idx = text.rfind(cutoff)
+        if idx != -1:
+            return text[: idx + 1].strip()
+    return None
+
+
 def _classify_intent_keywords(question: str, history: list[ChatTurn]) -> str:
     tokens = _tokenize(question)
     booking_score = len(tokens & _BOOKING_KEYWORDS)
@@ -148,11 +156,18 @@ class OrchestratorService:
             else f"Latest message: {question}"
         )
         try:
-            data = self.llm.generate_json(_TURN_CLASSIFIER_SYSTEM_PROMPT, user_prompt, max_tokens=60, temperature=0)
+            data = self.llm.generate_json(_TURN_CLASSIFIER_SYSTEM_PROMPT, user_prompt, max_tokens=300, temperature=0)
+            print("*"*50)
+            print(data)
+            print("*"*50)
             escalate = bool(data.get("escalate"))
             intent = data.get("intent")
             if intent not in ("booking", "knowledge"):
                 intent = _classify_intent_keywords(question, history)
+                print("*"*50)
+                print(intent)
+                print("*"*50)
+                
             return escalate, intent
         except Exception:
             logger.exception("LLM turn classification failed; falling back to keyword routing")
@@ -164,7 +179,7 @@ class OrchestratorService:
             return name, phone
 
         try:
-            data = self.llm.generate_json(_CONTACT_EXTRACTION_SYSTEM_PROMPT, message, max_tokens=60, temperature=0)
+            data = self.llm.generate_json(_CONTACT_EXTRACTION_SYSTEM_PROMPT, message, max_tokens=150, temperature=0)
 
             def _clean(value):
                 if not isinstance(value, str):
@@ -320,14 +335,24 @@ class OrchestratorService:
         business = self.db.query(Business).first()
         business_name = (business.name if business and business.name else None) or "the business"
         system_prompt = _HUMANIZE_SYSTEM_PROMPT.format(business_name=business_name)
+        if self.channel == "voice":
+            system_prompt += (
+                " This is a live VOICE call, not text: keep it to 1 short sentence, like a "
+                "quick spoken reply — mention at most 2-3 items if it's a list, then ask what "
+                "they're most interested in rather than reading everything."
+            )
         try:
-            rephrased = self.llm.generate(system_prompt, raw_answer, max_tokens=120, temperature=0.7)
+            rephrased = self.llm.generate(system_prompt, raw_answer, max_tokens=220, temperature=0.7)
             rephrased = (rephrased or "").strip()
             if rephrased and _looks_complete(rephrased):
                 return rephrased
             if rephrased:
-                logger.warning("Humanized answer looked truncated, using raw database text: %r", rephrased)
-        except Exception: 
+                salvaged = _salvage_incomplete(rephrased)
+                if salvaged:
+                    logger.warning("Humanized answer was truncated; salvaged to last full sentence")
+                    return salvaged
+                logger.warning("Humanized answer looked truncated with no salvageable sentence, using raw database text: %r", rephrased)
+        except Exception:
             logger.exception("Fast-path answer humanization failed; using raw database text")
         return raw_answer
 
@@ -374,9 +399,9 @@ class OrchestratorService:
         history_dicts = [{"role": t.role, "content": t.content} for t in history]
 
         if intent == "booking":
-            agent = BookingAgent(self.db, browser_id=self.browser_id, customer=self.customer)
+            agent = BookingAgent(self.db, browser_id=self.browser_id, customer=self.customer, channel=self.channel)
         else:
-            agent = KnowledgeAgent(self.db, customer=self.customer)
+            agent = KnowledgeAgent(self.db, customer=self.customer, channel=self.channel)
 
         reply = agent.handle(question, history_dicts)
 

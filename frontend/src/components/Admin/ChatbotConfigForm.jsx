@@ -222,6 +222,16 @@ export default function ChatbotConfigForm() {
             <span className="settings-toggle__track" aria-hidden="true" />
             Enable voice calling
           </label>
+          <label className="settings-toggle">
+            <input
+              type="checkbox"
+              checked={form.barge_in_enabled}
+              onChange={(e) => update("barge_in_enabled", e.target.checked)}
+              disabled={!form.voice_enabled}
+            />
+            <span className="settings-toggle__track" aria-hidden="true" />
+            Allow customer to interrupt while assistant is speaking (barge-in)
+          </label>
         </div>
         <div className="settings-form__grid">
           <label className="settings-form__field">

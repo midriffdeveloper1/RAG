@@ -49,6 +49,7 @@ class ChatbotConfig(Base):
     # Optional override spoken at the start of a call; falls back to
     # greeting_message when unset.
     voice_greeting_message: Mapped[str] = mapped_column(Text, nullable=True)
+    barge_in_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
     suggested_questions: Mapped[str] = mapped_column(
         Text,

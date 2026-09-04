@@ -8,15 +8,6 @@ import SuggestedQuestions from "./SuggestedQuestions.jsx";
 import VoiceCallWidget from "./VoiceCallWidget.jsx";
 import { MessageSquare, Mic, PhoneCall } from "../common/Icons.jsx";
 
-/**
- * Chat and Voice are two independent conversations (separate session ids),
- * each with its own useChat instance. Switching tabs never ends a call or
- * discards either transcript — a call only ends when the person explicitly
- * clicks "End Call", and the voice session id is kept afterwards so
- * re-opening the Voice tab resumes the same conversation rather than
- * starting over. Both reset on page refresh, or when the sidebar's "New
- * chat" clears them.
- */
 export default function ChatWidget({ sessionId = null, customerEmail, onSessionCreated }) {
   const [activeMode, setActiveMode] = useState("chat");
   const [voiceSessionId, setVoiceSessionId] = useState(null);
@@ -25,9 +16,13 @@ export default function ChatWidget({ sessionId = null, customerEmail, onSessionC
   const voiceChat = useChat(voiceSessionId, customerEmail, { onSessionCreated: setVoiceSessionId });
 
   const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [bargeInEnabled, setBargeInEnabled] = useState(true);
   useEffect(() => {
     getPublicChatbotConfig()
-      .then((config) => setVoiceEnabled(Boolean(config.voice_enabled)))
+      .then((config) => {
+        setVoiceEnabled(Boolean(config.voice_enabled));
+        setBargeInEnabled(config.barge_in_enabled !== false);
+      })
       .catch(() => setVoiceEnabled(false));
   }, []);
 
@@ -36,6 +31,7 @@ export default function ChatWidget({ sessionId = null, customerEmail, onSessionC
     customerEmail,
     chat: voiceChat,
     onSessionCreated: setVoiceSessionId,
+    bargeInEnabled,
   });
   const inCall = voice.callState !== VOICE_CALL_STATE.IDLE;
   const hasVoiceHistory = voiceChat.messages.some((m) => m.role === "user");
