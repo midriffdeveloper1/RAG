@@ -65,6 +65,13 @@ class Settings(BaseSettings):
     deepgram_api_key: str | None = None
     voice_token_ttl_seconds: int = 60
     voice_max_call_seconds: int = 900
+    
+    openrouter_api_key: str | None = ""
+    openrouter_model: str = "openai/gpt-oss-120b"   # or any OpenRouter model slug
+    openrouter_temperature: float = 0.7
+    openrouter_max_tokens: int = 1024
+    openrouter_site_url: str = ""
+    openrouter_site_name: str = ""
 
     business_name: str = " "
     business_description: str = ""

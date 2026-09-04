@@ -22,19 +22,6 @@ export const VOICE_CALL_STATE = {
 
 const SENTENCE_END = /[.!?]\s*$/;
 
-/**
- * Resolves the origin the voice control socket should connect to.
- *
- * The backend returns `ws_url` as a relative path (e.g. `/api/v1/voice/ws/{id}`),
- * so we need to prefix it with an absolute origin ourselves. Using
- * `window.location.origin` is wrong in dev: the page is served by the Vite
- * dev server (e.g. localhost:5173) while the FastAPI backend lives on a
- * different port (e.g. localhost:8000) — REST calls avoid this because
- * `apiClient` is explicitly pointed at VITE_API_BASE_URL, but a WebSocket
- * built from the page origin silently tries to connect to Vite instead,
- * which just hangs until the 8s connect timeout fires. Reuse the same
- * configured API origin here instead, converting http(s) -> ws(s).
- */
 function getWsOrigin() {
   const configured = import.meta.env.VITE_API_BASE_URL;
 
