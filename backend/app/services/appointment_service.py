@@ -2,7 +2,7 @@ import difflib
 import re
 import secrets
 from datetime import date as date_type
-from datetime import datetime, timedelta
+from datetime import datetime, time as time_type, timedelta
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -12,12 +12,29 @@ from app.models.appointment import Appointment, AppointmentStatus
 from app.models.knowledge_base import Business, OpeningHour, Service
 from app.models.staff import Staff
 from app.schemas.appointment import AdminAppointmentCreate, AdminAppointmentUpdate, AppointmentOut
-from app.services.time_utils import day_name, is_valid_email, is_valid_phone, parse_date, parse_time
+from app.services.time_utils import (
+    day_name,
+    format_display_date,
+    is_valid_email,
+    is_valid_phone,
+    parse_date,
+    parse_time,
+)
 
 settings = get_settings()
 
 _REFERENCE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 _REFERENCE_LENGTH = 8
+
+# Time-of-day windows used to filter slot listings (issue: never dump a
+# full day's slots — ask morning/afternoon/evening first, then filter to
+# that window). These are intentionally generous/overlapping-free bands;
+# they're additionally clipped to the business's real opening hours.
+_TIME_OF_DAY_WINDOWS = {
+    "morning": (time_type(0, 0), time_type(12, 0)),
+    "afternoon": (time_type(12, 0), time_type(17, 0)),
+    "evening": (time_type(17, 0), time_type(23, 59)),
+}
 
 
 def _to_ampm(hhmm: str) -> str:
@@ -28,7 +45,9 @@ def _to_ampm(hhmm: str) -> str:
 
 
 def _display_range(start_hhmm: str, end_hhmm: str) -> str:
-    return f"{_to_ampm(start_hhmm)} \u2013 {_to_ampm(end_hhmm)}"
+    # "to" instead of an en dash — reads naturally both in text and when
+    # spoken aloud by TTS (e.g. "9:30 AM to 10:30 AM"), never digit-by-digit.
+    return f"{_to_ampm(start_hhmm)} to {_to_ampm(end_hhmm)}"
 
 
 def generate_reference_code() -> str:
@@ -171,13 +190,101 @@ class AppointmentService:
 
     # Slot search
 
+    def _resolve_availability_context(
+        self, service: Service, target_date: date_type, staff_name: str | None
+    ) -> tuple[list[Staff] | None, time_type | None, time_type | None, list[tuple], dict | None]:
+        """Shared setup for both browsing slots and checking/booking one
+        exact time: business hours, holiday closures, and which staff
+        qualify. Returns (qualified_staff, open_t, close_t, closed_ranges,
+        error_dict). error_dict is set (and the rest None) if the day can't
+        be booked at all (closed, holiday, unknown staff, etc.)."""
+        business = self.db.query(Business).first()
+        opening = (
+            self.db.query(OpeningHour)
+            .filter(
+                OpeningHour.business_id == business.id,
+                OpeningHour.day_of_week == day_name(target_date),
+            )
+            .first()
+        )
+        if opening is None or opening.is_closed or not opening.open_time:
+            return None, None, None, [], {"slots": [], "message": f"We're closed on {day_name(target_date)}s."}
+
+        from app.services.holiday_service import HolidayService
+
+        closure = HolidayService(self.db).get_closure_for_date(business.id, target_date)
+        closed_ranges: list[tuple] = []
+        if closure is not None:
+            if closure.is_full_day:
+                reason = f" — {closure.note}" if closure.note else ""
+                return (
+                    None, None, None, [],
+                    {"slots": [], "message": f"We're closed on {format_display_date(target_date)}{reason}."},
+                )
+            closed_ranges.append((parse_time(closure.start_time), parse_time(closure.end_time)))
+
+        qualified_staff = [s for s in service.staff if s.is_active]
+        if staff_name:
+            staff = self._get_staff(staff_name)
+            if staff is None:
+                return None, None, None, [], {"error": f"No staff member named '{staff_name}'."}
+            if staff not in qualified_staff:
+                return None, None, None, [], {"error": f"{staff.name} doesn't perform {service.name}."}
+            qualified_staff = [staff]
+
+        if not qualified_staff:
+            return None, None, None, [], {"error": f"No staff are currently assigned to {service.name}."}
+
+        open_t = parse_time(opening.open_time)
+        close_t = parse_time(opening.close_time)
+        return qualified_staff, open_t, close_t, closed_ranges, None
+
+    def _free_staff_for_window(
+        self,
+        qualified_staff: list[Staff],
+        target_date: date_type,
+        start_time: time_type,
+        end_time: time_type,
+        closed_ranges: list[tuple],
+        exclude_appointment_id: str | None,
+    ) -> list[Staff]:
+        """Which of the qualified staff have nothing booked (and no holiday
+        closure) overlapping this exact window — a direct check for one
+        specific time, not dependent on any pre-built slot grid."""
+        free: list[Staff] = []
+        for staff in qualified_staff:
+            busy_query = self.db.query(Appointment).filter(
+                Appointment.staff_id == staff.id,
+                Appointment.appointment_date == target_date,
+                Appointment.status == AppointmentStatus.BOOKED,
+            )
+            if exclude_appointment_id is not None:
+                busy_query = busy_query.filter(Appointment.id != exclude_appointment_id)
+            busy_ranges = [(b.start_time, b.end_time) for b in busy_query.all()] + closed_ranges
+            overlaps = any(start_time < b_end and b_start < end_time for b_start, b_end in busy_ranges)
+            if not overlaps:
+                free.append(staff)
+        return free
+
     def find_available_slots(
         self,
         service_name: str,
         date_str: str,
         staff_name: str | None = None,
+        time_of_day: str | None = None,
+        preferred_time: str | None = None,
         exclude_appointment_id: str | None = None,
     ) -> dict:
+        """Two modes:
+        - preferred_time given: directly checks THAT exact time (any minute,
+          not just a fixed grid) and returns it as the single slot if any
+          qualified staff member is free — or a clear message if not. This
+          is how a customer's own requested time (e.g. "10am") gets checked
+          for real, rather than only ever offering pre-listed grid slots.
+        - preferred_time omitted: browses a grid of open slots, optionally
+          narrowed to a time_of_day window (morning/afternoon/evening) so we
+          never dump an entire day's worth of options at once.
+        """
         service = self._get_service(service_name)
         if service is None:
             return {
@@ -194,47 +301,82 @@ class AppointmentService:
         if window_error:
             return {"error": window_error}
 
-        business = self.db.query(Business).first()
-        opening = (
-            self.db.query(OpeningHour)
-            .filter(
-                OpeningHour.business_id == business.id,
-                OpeningHour.day_of_week == day_name(target_date),
-            )
-            .first()
+        qualified_staff, open_t, close_t, closed_ranges, error = self._resolve_availability_context(
+            service, target_date, staff_name
         )
-        if opening is None or opening.is_closed or not opening.open_time:
-            return {"slots": [], "message": f"We're closed on {day_name(target_date)}s."}
+        if error is not None:
+            return error
 
-        from app.services.holiday_service import HolidayService
-
-        closure = HolidayService(self.db).get_closure_for_date(business.id, target_date)
-        closed_start = closed_end = None
-        if closure is not None:
-            if closure.is_full_day:
-                reason = f" — {closure.note}" if closure.note else ""
-                return {"slots": [], "message": f"We're closed on {target_date}{reason}."}
-            closed_start = parse_time(closure.start_time)
-            closed_end = parse_time(closure.end_time)
-
-        qualified_staff = [s for s in service.staff if s.is_active]
-        if staff_name:
-            staff = self._get_staff(staff_name)
-            if staff is None:
-                return {"error": f"No staff member named '{staff_name}'."}
-            if staff not in qualified_staff:
-                return {"error": f"{staff.name} doesn't perform {service.name}."}
-            qualified_staff = [staff]
-
-        if not qualified_staff:
-            return {"error": f"No staff are currently assigned to {service.name}."}
-
-        open_t = parse_time(opening.open_time)
-        close_t = parse_time(opening.close_time)
         duration = service.duration_minutes
-        step = timedelta(minutes=settings.slot_step_minutes)
         now = datetime.now()
+        display_date = format_display_date(target_date)
 
+        # --- Mode 1: check one exact, customer-chosen time -------------
+        if preferred_time:
+            try:
+                start_time = parse_time(preferred_time)
+            except ValueError as exc:
+                return {"error": str(exc)}
+
+            start_dt = datetime.combine(target_date, start_time)
+            end_dt = start_dt + timedelta(minutes=duration)
+
+            if target_date == now.date() and start_dt <= now:
+                return {"slots": [], "message": "That time has already passed today — want a later time?"}
+            if start_dt < datetime.combine(target_date, open_t) or end_dt > datetime.combine(target_date, close_t):
+                return {
+                    "slots": [],
+                    "message": (
+                        f"That's outside our hours on {display_date} "
+                        f"({_display_range(open_t.strftime('%H:%M'), close_t.strftime('%H:%M'))}). "
+                        "Want a time inside that range?"
+                    ),
+                }
+
+            free_staff = self._free_staff_for_window(
+                qualified_staff, target_date, start_time, end_dt.time(), closed_ranges, exclude_appointment_id
+            )
+            if not free_staff:
+                return {
+                    "slots": [],
+                    "message": (
+                        "That exact time isn't available — everyone who does this service is "
+                        "already booked then. Want me to check a nearby time instead?"
+                    ),
+                }
+
+            slot = {
+                "start_time": start_time.strftime("%H:%M"),
+                "end_time": end_dt.time().strftime("%H:%M"),
+                "display_time": _display_range(start_time.strftime("%H:%M"), end_dt.time().strftime("%H:%M")),
+                "staff": [s.name for s in free_staff],
+            }
+            return {
+                "service": service.name,
+                "duration_minutes": duration,
+                "date": str(target_date),
+                "display_date": display_date,
+                "slots": [slot],
+            }
+
+        # --- Mode 2: browse a grid, optionally narrowed to a time of day ---
+        window_open, window_close = open_t, close_t
+        if time_of_day:
+            band = _TIME_OF_DAY_WINDOWS.get(time_of_day.strip().lower())
+            if band is None:
+                return {"error": "time_of_day must be 'morning', 'afternoon', or 'evening'."}
+            window_open = max(open_t, band[0])
+            window_close = min(close_t, band[1])
+            if window_open >= window_close:
+                return {
+                    "slots": [],
+                    "message": (
+                        f"We don't have any {time_of_day} availability on {display_date} — "
+                        "want me to check a different time of day or date?"
+                    ),
+                }
+
+        step = timedelta(minutes=settings.slot_step_minutes)
         slots_by_time: dict[tuple[str, str], list[str]] = {}
         for staff in qualified_staff:
             busy_query = self.db.query(Appointment).filter(
@@ -244,12 +386,10 @@ class AppointmentService:
             )
             if exclude_appointment_id is not None:
                 busy_query = busy_query.filter(Appointment.id != exclude_appointment_id)
-            busy_ranges = [(b.start_time, b.end_time) for b in busy_query.all()]
-            if closed_start is not None and closed_end is not None:
-                busy_ranges.append((closed_start, closed_end))
+            busy_ranges = [(b.start_time, b.end_time) for b in busy_query.all()] + closed_ranges
 
-            cursor = datetime.combine(target_date, open_t)
-            day_end = datetime.combine(target_date, close_t)
+            cursor = datetime.combine(target_date, window_open)
+            day_end = datetime.combine(target_date, window_close)
             while cursor + timedelta(minutes=duration) <= day_end:
                 if target_date == now.date() and cursor <= now:
                     cursor += step
@@ -265,10 +405,11 @@ class AppointmentService:
                     slots_by_time.setdefault(key, []).append(staff.name)
                 cursor += step
 
-        
         distinct_times = sorted(slots_by_time.keys())
-        max_slots = 10
+        truncated = False
+        max_slots = 8
         if len(distinct_times) > max_slots:
+            truncated = True
             last_index = len(distinct_times) - 1
             picked_indices = sorted({round(i * last_index / (max_slots - 1)) for i in range(max_slots)})
             distinct_times = [distinct_times[i] for i in picked_indices]
@@ -283,12 +424,22 @@ class AppointmentService:
             for start, end in distinct_times
         ]
 
-        return {
+        result = {
             "service": service.name,
             "duration_minutes": duration,
             "date": str(target_date),
+            "display_date": display_date,
             "slots": slots,
         }
+        if not slots:
+            when = f" in the {time_of_day}" if time_of_day else ""
+            result["message"] = f"Nothing open{when} on {display_date} for this service — try another date?"
+        elif truncated:
+            result["message"] = (
+                "Showing a spread of open times — if none of these work, tell me a specific time "
+                "and I'll check it directly, there may be more availability than shown."
+            )
+        return result
 
     # Booking
 
@@ -342,6 +493,7 @@ class AppointmentService:
                 "service": service.name,
                 "staff": staff.name if staff else None,
                 "date": str(existing.appointment_date),
+                "display_date": format_display_date(existing.appointment_date),
                 "start_time": existing.start_time.strftime("%H:%M"),
                 "end_time": existing.end_time.strftime("%H:%M"),
                 "display_time": _display_range(
@@ -355,19 +507,23 @@ class AppointmentService:
         if window_error:
             return {"error": window_error}
 
+        # Check this EXACT requested time directly — not against a fixed
+        # 30-minute grid. Any time the customer names is valid as long as
+        # some qualified staff member is actually free for the full
+        # duration; we only say "unavailable" when that's really true.
         available = self.find_available_slots(
-            service_name, date_str, staff_name, exclude_appointment_id=exclude_appointment_id
+            service_name,
+            date_str,
+            staff_name,
+            preferred_time=start_time_str,
+            exclude_appointment_id=exclude_appointment_id,
         )
         if "error" in available:
             return available
+        if not available.get("slots"):
+            return {"error": available.get("message") or "That slot isn't available anymore. Please pick another time."}
 
-        match = next(
-            (s for s in available["slots"] if s["start_time"] == start_time.strftime("%H:%M")),
-            None,
-        )
-        if match is None:
-            return {"error": "That slot isn't available anymore. Please pick another time."}
-
+        match = available["slots"][0]
         assigned_staff = self._get_staff(match["staff"][0])
         if assigned_staff is None:
             return {"error": "That slot isn't available anymore. Please pick another time."}
@@ -397,6 +553,7 @@ class AppointmentService:
             "service": service.name,
             "staff": assigned_staff.name,
             "date": str(target_date),
+            "display_date": format_display_date(target_date),
             "start_time": start_time.strftime("%H:%M"),
             "end_time": end_time.strftime("%H:%M"),
             "display_time": _display_range(start_time.strftime("%H:%M"), end_time.strftime("%H:%M")),
@@ -528,6 +685,7 @@ class AppointmentService:
             "service": appointment.service.name,
             "staff": appointment.staff.name,
             "date": str(appointment.appointment_date),
+            "display_date": format_display_date(appointment.appointment_date),
             "start_time": appointment.start_time.strftime("%H:%M"),
             "end_time": appointment.end_time.strftime("%H:%M"),
             "display_time": _display_range(
@@ -559,6 +717,7 @@ class AppointmentService:
                     "appointment_id": a.reference_code,
                     "service": a.service.name,
                     "date": str(a.appointment_date),
+                    "display_date": format_display_date(a.appointment_date),
                     "start_time": a.start_time.strftime("%H:%M"),
                     "display_time": _to_ampm(a.start_time.strftime("%H:%M")),
                     "status": a.status.value,

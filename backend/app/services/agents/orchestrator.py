@@ -32,7 +32,8 @@ _KNOWLEDGE_KEYWORDS = {
 
 _TURN_CLASSIFIER_SYSTEM_PROMPT = """Routing classifier for a salon assistant. Given the latest customer message (with context), output JSON:
 {"escalate": true|false, "intent": "booking"|"knowledge"}
-escalate=true only if they clearly ask for a human/manager/ticket, or show real anger/frustration (not mild "no"). intent="booking" for availability/booking/reschedule/cancel/their own appointment; else "knowledge". Fill intent either way. JSON only."""
+escalate=true ONLY if they clearly ask for a human/manager/ticket, or show real anger/frustration (not mild "no"). If unsure, escalate=false.
+intent="booking" for availability/booking/reschedule/cancel/their own appointment/picking a date or time in an ongoing booking; intent="knowledge" for anything about the business itself (services, pricing, hours, policies, location). If genuinely ambiguous, prefer whichever intent matches the most recent conversation turns. Always fill intent with one of these two values, even when escalate=true. Output strict JSON only, no other text."""
 
 _HUMANIZE_SYSTEM_PROMPT = """You're {business_name}'s front-desk assistant, texting a customer. Reword the given fact briefly and naturally, like a real person would — no markdown tables, no internal jargon. If it's a repetitive pattern (e.g. the same hours across several days), summarize it in one sentence instead of listing each day. If it's a list of distinct items (e.g. services with prices, staff names), keep it as a short clean list — don't compress away the actual items customers need to choose from. Never add/remove/change facts. Vary phrasing. Don't mention "the database" or that you're rephrasing."""
 
@@ -157,17 +158,10 @@ class OrchestratorService:
         )
         try:
             data = self.llm.generate_json(_TURN_CLASSIFIER_SYSTEM_PROMPT, user_prompt, max_tokens=300, temperature=0)
-            print("*"*50)
-            print(data)
-            print("*"*50)
             escalate = bool(data.get("escalate"))
             intent = data.get("intent")
             if intent not in ("booking", "knowledge"):
                 intent = _classify_intent_keywords(question, history)
-                print("*"*50)
-                print(intent)
-                print("*"*50)
-                
             return escalate, intent
         except Exception:
             logger.exception("LLM turn classification failed; falling back to keyword routing")

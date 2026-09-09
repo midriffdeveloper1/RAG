@@ -68,7 +68,10 @@ class Settings(BaseSettings):
     
     openrouter_api_key: str | None = ""
     openrouter_model: str = "openai/gpt-oss-120b"   # or any OpenRouter model slug
-    openrouter_temperature: float = 0.7
+    # Lower = stricter/more deterministic. Agent tool-calling (booking/knowledge)
+    # is grounded in tool results, not creative writing, so keep this low to
+    # cut down on hallucinated/inconsistent replies.
+    openrouter_temperature: float = 0.3
     openrouter_max_tokens: int = 1024
     openrouter_site_url: str = ""
     openrouter_site_name: str = ""

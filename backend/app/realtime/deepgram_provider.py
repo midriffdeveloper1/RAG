@@ -65,7 +65,18 @@ class DeepgramVoiceProvider(RealtimeVoiceProvider):
                 "language": "en-US",
                 "smart_format": "true",
                 "interim_results": "true",
-                "endpointing": "300",
+                # A short pause mid-sentence (breathing, thinking of a word)
+                # is normal human speech, not "done talking" — 300ms was
+                # cutting utterances off too early, which both dropped part
+                # of what the customer said and produced replies to
+                # fragments. ~1s of silence is a much more reliable signal
+                # that they're actually finished.
+                "endpointing": "1000",
+                # Safety net: if `speech_final` never fires for some reason
+                # (dropped VAD event, etc.), UtteranceEnd still guarantees
+                # we process what was said instead of hanging in "listening"
+                # forever and forcing the customer to repeat themselves.
+                "utterance_end_ms": "1500",
                 "vad_events": "true",
                 "encoding": "linear16",
                 "sample_rate": "16000",
