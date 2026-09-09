@@ -1,15 +1,14 @@
 import { useEffect, useState } from "react";
 import { useChat } from "../../hooks/useChat.js";
 import { useVoiceSession, VOICE_CALL_STATE } from "../../hooks/useVoiceSession.js";
-import { getPublicChatbotConfig } from "../../services/api.js";
+import { deleteChatSession, getPublicChatbotConfig } from "../../services/api.js";
 import ChatWindow from "./ChatWindow.jsx";
 import ChatInput from "./ChatInput.jsx";
 import SuggestedQuestions from "./SuggestedQuestions.jsx";
-import VoiceCallWidget from "./VoiceCallWidget.jsx";
-import { MessageSquare, Mic, PhoneCall } from "../common/Icons.jsx";
+import VoiceCallModal from "./VoiceCallModal.jsx";
+import { MessageSquare, Mic } from "../common/Icons.jsx";
 
 export default function ChatWidget({ sessionId = null, customerEmail, onSessionCreated }) {
-  const [activeMode, setActiveMode] = useState("chat");
   const [voiceSessionId, setVoiceSessionId] = useState(null);
 
   const textChat = useChat(sessionId, customerEmail, { onSessionCreated });
@@ -34,10 +33,19 @@ export default function ChatWidget({ sessionId = null, customerEmail, onSessionC
     bargeInEnabled,
   });
   const inCall = voice.callState !== VOICE_CALL_STATE.IDLE;
-  const hasVoiceHistory = voiceChat.messages.some((m) => m.role === "user");
+  const hasUserMessaged = textChat.messages.some((m) => m.role === "user");
 
-  const activeChat = activeMode === "voice" ? voiceChat : textChat;
-  const hasUserMessaged = activeChat.messages.some((m) => m.role === "user");
+  // Every call starts fresh — no "resume" option. When a call ends, its
+  // backend session is deleted and the local id cleared, so the next
+  // "Start Voice Call" always creates a brand-new conversation.
+  const handleEndCall = async () => {
+    const endedSessionId = voiceSessionId;
+    await voice.endCall();
+    setVoiceSessionId(null);
+    if (endedSessionId && customerEmail) {
+      deleteChatSession(endedSessionId, customerEmail).catch(() => {});
+    }
+  };
 
   return (
     <section className="chat-widget" aria-label="Support chat">
@@ -46,54 +54,50 @@ export default function ChatWidget({ sessionId = null, customerEmail, onSessionC
           <button
             type="button"
             role="tab"
-            aria-selected={activeMode === "chat"}
-            className={`chat-mode-toggle__btn ${activeMode === "chat" ? "chat-mode-toggle__btn--active" : ""}`}
-            onClick={() => setActiveMode("chat")}
+            aria-selected="true"
+            className="chat-mode-toggle__btn chat-mode-toggle__btn--active"
+            disabled
           >
             <MessageSquare size={15} />
             <span>Chat</span>
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={activeMode === "voice"}
-            className={`chat-mode-toggle__btn ${activeMode === "voice" ? "chat-mode-toggle__btn--active" : ""}`}
-            onClick={() => setActiveMode("voice")}
+            className="chat-mode-toggle__btn"
+            onClick={voice.startCall}
+            disabled={inCall}
           >
             <Mic size={15} />
-            <span>Voice Call{inCall ? " •" : ""}</span>
+            <span>{inCall ? "Call in progress…" : "Start Voice Call"}</span>
           </button>
         </div>
       )}
 
-      {activeChat.isLoadingHistory ? (
+      {textChat.isLoadingHistory ? (
         <div className="chat-window chat-window--loading">Loading conversation…</div>
       ) : (
-        <ChatWindow messages={activeChat.messages} isLoading={activeChat.isLoading} />
+        <ChatWindow messages={textChat.messages} isLoading={textChat.isLoading} />
       )}
 
-      {activeMode === "voice" ? (
-        inCall ? (
-          <VoiceCallWidget callState={voice.callState} error={voice.error} onEndCall={voice.endCall} />
-        ) : (
-          <div className="voice-call voice-call--idle">
-            {voice.error && <p className="voice-call__error">{voice.error}</p>}
-            <button type="button" className="voice-call__start-btn" onClick={voice.startCall}>
-              <PhoneCall size={16} />
-              <span>{hasVoiceHistory ? "Resume Voice Call" : "Start Voice Call"}</span>
-            </button>
-          </div>
-        )
-      ) : (
-        <>
-          {!hasUserMessaged && !activeChat.isLoadingHistory && (
-            <SuggestedQuestions onSelect={textChat.sendMessage} disabled={textChat.isLoading} />
-          )}
+      {!hasUserMessaged && !textChat.isLoadingHistory && (
+        <SuggestedQuestions onSelect={textChat.sendMessage} disabled={textChat.isLoading} />
+      )}
 
-          {textChat.error && <p className="chat-widget__error">{textChat.error}</p>}
+      {textChat.error && <p className="chat-widget__error">{textChat.error}</p>}
 
-          <ChatInput onSend={textChat.sendMessage} disabled={textChat.isLoading || textChat.isLoadingHistory} />
-        </>
+      <ChatInput onSend={textChat.sendMessage} disabled={textChat.isLoading || textChat.isLoadingHistory} />
+
+      {inCall && (
+        <VoiceCallModal
+          messages={voiceChat.messages}
+          callState={voice.callState}
+          error={voice.error}
+          micMuted={voice.micMuted}
+          speakerMuted={voice.speakerMuted}
+          onToggleMic={voice.toggleMic}
+          onToggleSpeaker={voice.toggleSpeaker}
+          onEndCall={handleEndCall}
+        />
       )}
     </section>
   );

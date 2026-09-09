@@ -405,3 +405,35 @@ export function PhoneCall(props) {
     </Svg>
   );
 }
+
+export function MicOff(props) {
+  return (
+    <Svg {...props}>
+      <line x1="2" y1="2" x2="22" y2="22" />
+      <path d="M9 9v3a3 3 0 0 0 4.6 2.5M15 9.4V5a3 3 0 0 0-5.9-.8" />
+      <path d="M5 10a7 7 0 0 0 10.3 6.2M19 10a7 7 0 0 1-.4 2.3" />
+      <line x1="12" y1="19" x2="12" y2="22" />
+      <line x1="8" y1="22" x2="16" y2="22" />
+    </Svg>
+  );
+}
+
+export function Volume2(props) {
+  return (
+    <Svg {...props}>
+      <polygon points="4,9 8,9 12,5 12,19 8,15 4,15" />
+      <path d="M16 8a5 5 0 0 1 0 8" />
+      <path d="M19 5a9 9 0 0 1 0 14" />
+    </Svg>
+  );
+}
+
+export function VolumeX(props) {
+  return (
+    <Svg {...props}>
+      <polygon points="4,9 8,9 12,5 12,19 8,15 4,15" />
+      <line x1="17" y1="9" x2="23" y2="15" />
+      <line x1="23" y1="9" x2="17" y2="15" />
+    </Svg>
+  );
+}
