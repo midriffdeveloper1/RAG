@@ -699,6 +699,132 @@ body {
   opacity: 0.75;
 }
 
+/* --- Voice call modal --- */
+.voice-modal-overlay {
+  z-index: 200;
+}
+
+.voice-modal-card {
+  max-width: 420px;
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.voice-modal__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.voice-modal__header h2 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  color: var(--color-primary-dark);
+  margin: 0;
+}
+
+.voice-modal__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.voice-modal__transcript {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 220px;
+}
+
+.voice-modal__transcript-empty {
+  margin: auto;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+}
+
+.voice-modal__indicator {
+  width: 40px;
+  height: 6px;
+  border-radius: 999px;
+  margin: 4px auto 16px;
+  background: var(--color-border);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.voice-modal__indicator.voice-call__indicator--listening {
+  background: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(47, 69, 56, 0.1);
+}
+
+.voice-modal__indicator.voice-call__indicator--speaking {
+  background: var(--color-primary-dark);
+  animation: voice-pulse 1.1s ease-in-out infinite;
+}
+
+.voice-modal__controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 16px 20px 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.voice-modal__ctrl-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.voice-modal__ctrl-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-text);
+}
+
+.voice-modal__ctrl-btn--active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.voice-modal__end-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 50%;
+  background: #a8402f;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.voice-modal__end-btn:hover {
+  background: #8c3526;
+}
+
 /* --- Admin: login --- */
 .admin-login-page {
   width: 100%;

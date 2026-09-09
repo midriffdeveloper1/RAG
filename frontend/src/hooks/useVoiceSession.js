@@ -38,7 +38,10 @@ function toWsUrl(relativePath) {
 export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreated, bargeInEnabled = true }) {
   const [callState, setCallStateRaw] = useState(VOICE_CALL_STATE.IDLE);
   const [error, setError] = useState(null);
+  const [micMuted, setMicMutedRaw] = useState(false);
+  const [speakerMuted, setSpeakerMutedRaw] = useState(false);
   const callStateRef = useRef(VOICE_CALL_STATE.IDLE);
+  const micMutedRef = useRef(false);
 
   const setCallState = useCallback((next) => {
     callStateRef.current = next;
@@ -54,6 +57,11 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
   const assistantBufferRef = useRef("");
   const ttsSentenceBufferRef = useRef("");
   const pendingBargeInRef = useRef(false);
+  // Deepgram sends one "Results" message per finalized chunk of speech —
+  // `speech_final` only marks the LAST chunk of a full utterance, so the
+  // pieces before it must be accumulated, not overwritten, or everything
+  // but the final fragment gets silently dropped before it's ever sent.
+  const finalizedTranscriptRef = useRef("");
 
   const cleanup = useCallback(async () => {
     if (stopMicRef.current) {
@@ -75,6 +83,26 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
     assistantBufferRef.current = "";
     ttsSentenceBufferRef.current = "";
     pendingBargeInRef.current = false;
+    finalizedTranscriptRef.current = "";
+    micMutedRef.current = false;
+    setMicMutedRaw(false);
+    setSpeakerMutedRaw(false);
+  }, []);
+
+  /** Mic mute — the mic keeps capturing (avoids re-negotiating the device),
+   * we just stop forwarding frames to STT while muted. */
+  const toggleMic = useCallback(() => {
+    micMutedRef.current = !micMutedRef.current;
+    setMicMutedRaw(micMutedRef.current);
+  }, []);
+
+  /** Loudspeaker mute — silences assistant audio without pausing the call. */
+  const toggleSpeaker = useCallback(() => {
+    setSpeakerMutedRaw((prev) => {
+      const next = !prev;
+      ttsRef.current?.playback?.setMuted(next);
+      return next;
+    });
   }, []);
 
   const speakSentence = useCallback((sentence) => {
@@ -190,6 +218,7 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
       const pcmQueue = [];
       stopMicRef.current = await startMicCapture(
         (pcm) => {
+          if (micMutedRef.current) return;
           if (sttSocket?.readyState === WebSocket.OPEN) {
             sttSocket.send(pcm);
           } else if (pcmQueue.length < 100) {
@@ -206,13 +235,37 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
         }
       );
 
+      const displayTranscript = (partial = "") => {
+        const combined = [finalizedTranscriptRef.current, partial].filter(Boolean).join(" ").trim();
+        if (!combined) return;
+        if (!userMessageIdRef.current) {
+          userMessageIdRef.current = chat.appendMessage("user", combined, { channel: "voice" });
+        } else {
+          chat.updateMessage(userMessageIdRef.current, combined);
+        }
+      };
+
+      const sendFinalTranscript = () => {
+        const text = finalizedTranscriptRef.current.trim();
+        finalizedTranscriptRef.current = "";
+        if (!text || controlSocket.readyState !== WebSocket.OPEN) {
+          userMessageIdRef.current = null;
+          return;
+        }
+        pendingBargeInRef.current = false;
+        setCallState(VOICE_CALL_STATE.PROCESSING);
+        controlSocket.send(
+          JSON.stringify({
+            type: "user.transcript.final",
+            data: { text, customer_email: customerEmail || null },
+          })
+        );
+        userMessageIdRef.current = null;
+      };
+
       sttSocket = connectSTT(session.stt, session.deepgram_token, {
         onPartial: (text) => {
-          if (!userMessageIdRef.current) {
-            userMessageIdRef.current = chat.appendMessage("user", text, { channel: "voice" });
-          } else {
-            chat.updateMessage(userMessageIdRef.current, text);
-          }
+          displayTranscript(text);
           // Confirmed real speech (not just a VAD blip) — now it's safe to
           // actually cut the assistant off, if barge-in is allowed.
           if (pendingBargeInRef.current && bargeInEnabled && text.trim().length >= MIN_BARGE_IN_CHARS) {
@@ -222,22 +275,22 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
           }
         },
         onFinal: (text, speechFinal) => {
-          if (!userMessageIdRef.current) {
-            userMessageIdRef.current = chat.appendMessage("user", text, { channel: "voice" });
-          } else {
-            chat.updateMessage(userMessageIdRef.current, text);
+          // Accumulate — a single utterance often arrives as several
+          // `is_final` chunks, and only the last carries `speech_final`.
+          if (text.trim()) {
+            finalizedTranscriptRef.current = [finalizedTranscriptRef.current, text.trim()]
+              .filter(Boolean)
+              .join(" ");
           }
-          if (speechFinal && text.trim() && controlSocket.readyState === WebSocket.OPEN) {
-            pendingBargeInRef.current = false;
-            setCallState(VOICE_CALL_STATE.PROCESSING);
-            controlSocket.send(
-              JSON.stringify({
-                type: "user.transcript.final",
-                data: { text: text.trim(), customer_email: customerEmail || null },
-              })
-            );
-            userMessageIdRef.current = null;
-          }
+          displayTranscript();
+          if (speechFinal) sendFinalTranscript();
+        },
+        onUtteranceEnd: () => {
+          // Fallback: word-timing gap detected with no `speech_final` —
+          // still finalize whatever we've accumulated so the call never
+          // gets stuck waiting and the customer never has to repeat
+          // themselves for no visible reason.
+          if (finalizedTranscriptRef.current.trim()) sendFinalTranscript();
         },
         onSpeechStarted: () => {
           // VAD fired — this alone might just be background noise, so we
@@ -302,5 +355,5 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
     setCallState(VOICE_CALL_STATE.IDLE);
   }, [cleanup, setCallState]);
 
-  return { callState, error, startCall, endCall };
+  return { callState, error, startCall, endCall, micMuted, speakerMuted, toggleMic, toggleSpeaker };
 }
