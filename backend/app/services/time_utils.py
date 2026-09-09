@@ -37,3 +37,9 @@ def is_valid_phone(value: str) -> bool:
 
 def day_name(value: date) -> str:
     return value.strftime("%A")
+
+
+def format_display_date(value: date) -> str:
+    """Human-friendly date for display/speech, e.g. '10 Sep, 2026' — never
+    a leading zero on the day, so it reads naturally instead of digit-by-digit."""
+    return f"{value.day} {value.strftime('%b')}, {value.year}"
