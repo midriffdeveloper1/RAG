@@ -12,7 +12,10 @@ export default function ChatWidget({ sessionId = null, customerEmail, onSessionC
   const [voiceSessionId, setVoiceSessionId] = useState(null);
 
   const textChat = useChat(sessionId, customerEmail, { onSessionCreated });
-  const voiceChat = useChat(voiceSessionId, customerEmail, { onSessionCreated: setVoiceSessionId });
+  const voiceChat = useChat(voiceSessionId, customerEmail, {
+    onSessionCreated: setVoiceSessionId,
+    initialMessages: [],
+  });
 
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [bargeInEnabled, setBargeInEnabled] = useState(true);
@@ -35,9 +38,6 @@ export default function ChatWidget({ sessionId = null, customerEmail, onSessionC
   const inCall = voice.callState !== VOICE_CALL_STATE.IDLE;
   const hasUserMessaged = textChat.messages.some((m) => m.role === "user");
 
-  // Every call starts fresh — no "resume" option. When a call ends, its
-  // backend session is deleted and the local id cleared, so the next
-  // "Start Voice Call" always creates a brand-new conversation.
   const handleEndCall = async () => {
     const endedSessionId = voiceSessionId;
     await voice.endCall();

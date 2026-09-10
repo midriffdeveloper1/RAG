@@ -150,6 +150,10 @@ class VectorStoreService:
                 )
 
         scored.sort(key=lambda item: item["combined_score"], reverse=True)
+        print("#"*50)
+        print(scored[:top_k])
+        print("#"*50)
+        
         return scored[:top_k]
 
 

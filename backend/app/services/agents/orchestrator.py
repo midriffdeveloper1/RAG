@@ -8,6 +8,7 @@ from app.models.chat_session import ChatMessage, ChatSession
 from app.models.customer import Customer
 from app.schemas.chat import ChatResponse, ChatTurn
 from app.services.agents.booking_agent import BookingAgent
+from app.services.agents.tool_loop import _dedupe_repeated_sentences
 from app.services.agents.knowledge_agent import KnowledgeAgent
 from app.services.agents.support_agent import SupportAgent
 from app.services.business_lookup_service import BusinessLookupService
@@ -337,7 +338,7 @@ class OrchestratorService:
             )
         try:
             rephrased = self.llm.generate(system_prompt, raw_answer, max_tokens=220, temperature=0.7)
-            rephrased = (rephrased or "").strip()
+            rephrased = _dedupe_repeated_sentences((rephrased or "").strip())
             if rephrased and _looks_complete(rephrased):
                 return rephrased
             if rephrased:
@@ -364,7 +365,11 @@ class OrchestratorService:
 
         reason = self.support.check_message(question) or self.support.check_streak(session)
         intent = None
-        if not reason:
+
+        last_assistant_agent = next((t.agent for t in reversed(history) if t.role == "assistant"), None)
+        in_active_booking = last_assistant_agent == "booking"
+
+        if not reason and not in_active_booking:
             intent = _fast_route_intent(question)
 
         if not reason and intent is None:
@@ -372,7 +377,7 @@ class OrchestratorService:
             if escalate:
                 reason = "Customer indicated they want a human, or showed clear frustration (LLM-detected)."
 
-        if not reason and intent == "knowledge":
+        if not reason and intent == "knowledge" and not in_active_booking:
             fast_answer = self._try_fast_knowledge_answer(question)
             if fast_answer:
                 fast_answer = self._humanize_fast_answer(fast_answer)

@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     keyword_boost_weight: float = 0.3
     relevance_score_threshold: float = 0.1
 
-    max_history_exchanges: int = 8
+    max_history_exchanges: int = 16
 
     cancellation_window_hours: int = 24
 

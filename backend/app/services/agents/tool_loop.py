@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -8,6 +9,29 @@ from app.services.llm_service import get_llm_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+_SENTENCE_SPLIT = re.compile(r'(?<=[.!?])\s*(?=[A-Z"\'])')
+
+
+def _dedupe_repeated_sentences(text: str) -> str:
+    if not text:
+        return text
+    sentences = [s for s in _SENTENCE_SPLIT.split(text.strip()) if s.strip()]
+    if len(sentences) < 2:
+        return text
+    kept: list[str] = []
+    seen_word_sets: list[set[str]] = []
+    for sentence in sentences:
+        words = set(re.findall(r"[a-z0-9']+", sentence.lower()))
+        if not words:
+            continue
+        if kept and any("?" in s for s in kept):
+            break
+        if any(len(words & prior) / max(1, len(words | prior)) > 0.55 for prior in seen_word_sets):
+            break
+        kept.append(sentence)
+        seen_word_sets.append(words)
+    return " ".join(kept) if kept else text
 
 
 @dataclass
@@ -46,7 +70,7 @@ class ToolCallingAgent:
             message = self.llm.chat(messages, tools=self.tool_schemas())
 
             if not message.tool_calls:
-                return AgentReply(answer=message.content, agent=self.agent_name)
+                return AgentReply(answer=_dedupe_repeated_sentences(message.content or ""), agent=self.agent_name)
 
             messages.append(
                 {
@@ -96,7 +120,7 @@ class ToolCallingAgent:
         try:
             final = self.llm.chat(messages + [{"role": "user", "content": prompt}], tools=None)
             if final.content:
-                return final.content
+                return _dedupe_repeated_sentences(final.content)
         except Exception:  # noqa: BLE001 - best-effort fallback, never raise here
             logger.exception("Fallback reply generation failed for agent '%s'", self.agent_name)
         return self.fallback_message()
