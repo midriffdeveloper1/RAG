@@ -207,22 +207,23 @@ class BusinessLookupService:
             return best.content
         return None
 
-    def answer(self, business, question: str) -> str | None:
+    def answer(self, business, question: str, include_catalog: bool = True) -> str | None:
+
         if business is None:
             return None
         tokens = _tokenize(question)
 
-        for matcher in (
+        matchers = [
             self._match_hours,
             self._match_holidays,
             self._match_address,
             self._match_contact,
-            # self._match_services,
-            # self._match_staff,
-            self._match_faq,
-            self._match_policy,
-            self._match_about,
-        ):
+        ]
+        if include_catalog:
+            matchers += [self._match_services, self._match_staff]
+        matchers += [self._match_faq, self._match_policy, self._match_about]
+
+        for matcher in matchers:
             result = matcher(business, tokens, question)
             if result:
                 return result

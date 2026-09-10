@@ -31,10 +31,7 @@ def _chunk_for_delta(text: str) -> Iterator[str]:
 
 
 def greeting_turn(db: Session, session: ChatSession, channel: str = "voice") -> Iterator[RealtimeEvent]:
-    """The very first thing the customer hears when a call connects — a
-    short spoken welcome, before they've said anything. Deliberately
-    templated (not an LLM call) so it's instant and never waits on a model
-    round-trip right as the call picks up."""
+
     cfg = admin_config(db)
     business_name = (cfg.get("business_name") or "").strip() or "our business"
     greeting = f"Hi there! Welcome to {business_name}. How can I help you today?"
@@ -96,5 +93,6 @@ def stream_turn(
             "needs_human": response.needs_human,
             "ticket_number": response.ticket_number,
             "agent": response.agent,
+            "conversation_ended": response.conversation_ended,
         },
     )

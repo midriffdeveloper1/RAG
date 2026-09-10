@@ -62,6 +62,39 @@ _NEEDS_LLM_REVIEW_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+_FAREWELL_PATTERN = re.compile(
+    r"\b(bye|goodbye|good\s*bye|take\s*care|have\s*a\s*(good|great|nice)\s*(day|one))\b",
+    re.IGNORECASE,
+)
+_WRAP_UP_PROMPT_PATTERN = re.compile(
+    r"(anything else|something else|else i can help|help (you )?with anything else|"
+    r"need anything else|else you('d| would) like|further (help|assistance)|"
+    r"else i can (do|assist))",
+    re.IGNORECASE,
+)
+_CLOSING_FRAGMENT = (
+    r"(?:no+p{0,2}e?|nothing(?:\s*else)?|(?:that'?s|that is)\s*(?:all|it)|"
+    r"i'?m\s*(?:good|done|all\s*set)|all\s*good|thanks?|thank\s*you|"
+    r"that(?:'ll| will) be all|no\s*more(?:\s*questions)?|we'?re\s*(?:good|done))"
+)
+_CLOSING_RESPONSE_PATTERN = re.compile(
+    rf"^\s*{_CLOSING_FRAGMENT}(?:\s*[,.]?\s*(?:and\s*)?{_CLOSING_FRAGMENT})*\s*[.!]?\s*$",
+    re.IGNORECASE,
+)
+
+
+def _is_conversation_ending(question: str, history: list[ChatTurn]) -> bool:
+   
+    stripped = question.strip()
+    if not stripped:
+        return False
+    if _FAREWELL_PATTERN.search(stripped):
+        return True
+    if not _CLOSING_RESPONSE_PATTERN.match(stripped):
+        return False
+    last_assistant = next((t.content for t in reversed(history) if t.role == "assistant"), None)
+    return bool(last_assistant and _WRAP_UP_PROMPT_PATTERN.search(last_assistant))
+
 
 def _fast_route_intent(question: str) -> str | None:
     if _NEEDS_LLM_REVIEW_PATTERN.search(question):
@@ -239,6 +272,26 @@ class OrchestratorService:
             ticket_number=session.ticket_number,
         )
 
+    def _handle_conversation_end(
+        self, session: ChatSession, sessions: ChatSessionService, persist: bool
+    ) -> ChatResponse:
+        from app.models.knowledge_base import Business
+
+        business = self.db.query(Business).first()
+        business_name = (business.name if business and business.name else None) or "us"
+        farewell = f"Thanks so much for reaching out to {business_name} \u2014 have a wonderful day!"
+        session.unresolved_streak = 0
+        session.updated_at = datetime.utcnow()
+        self.db.commit()
+        if persist:
+            sessions.append_message(
+                session, "assistant", farewell, agent="farewell", channel=self.channel, message_type="assistant_text"
+            )
+        return ChatResponse(
+            answer=farewell, sources=[], session_id=session.id, needs_human=False, agent="farewell",
+            conversation_ended=True,
+        )
+
     def _finalize_escalation(
         self, reason: str, session: ChatSession, sessions: ChatSessionService,
         tickets: SupportTicketService, persist: bool,
@@ -322,7 +375,7 @@ class OrchestratorService:
         business = self.db.query(Business).first()
         if business is None:
             return None
-        return BusinessLookupService(self.db).answer(business, question)
+        return BusinessLookupService(self.db).answer(business, question, include_catalog=False)
 
     def _humanize_fast_answer(self, raw_answer: str) -> str:
         from app.models.knowledge_base import Business
@@ -363,8 +416,12 @@ class OrchestratorService:
         if session.awaiting_contact_info:
             return self._handle_pending_escalation(question, session, sessions, tickets, persist)
 
+        if _is_conversation_ending(question, history):
+            return self._handle_conversation_end(session, sessions, persist)
+
         reason = self.support.check_message(question) or self.support.check_streak(session)
         intent = None
+
 
         last_assistant_agent = next((t.agent for t in reversed(history) if t.role == "assistant"), None)
         in_active_booking = last_assistant_agent == "booking"

@@ -42,3 +42,4 @@ class ChatResponse(BaseModel):
     needs_human: bool = False
     agent: Optional[str] = None
     ticket_number: Optional[str] = None
+    conversation_ended: bool = False

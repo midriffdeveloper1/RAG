@@ -23,7 +23,6 @@ function toWsUrl(relativePath) {
   return `${wsProtocol}//${apiBase.host}${relativePath}`;
 }
 
-
 export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreated, bargeInEnabled = true }) {
   const [callState, setCallStateRaw] = useState(VOICE_CALL_STATE.IDLE);
   const [error, setError] = useState(null);
@@ -47,6 +46,7 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
   const ttsSentenceBufferRef = useRef("");
   const pendingBargeInRef = useRef(false);
   const pendingSpeechRef = useRef([]);
+  const shouldEndCallRef = useRef(false);
   const finalizedTranscriptRef = useRef("");
 
   const cleanup = useCallback(async () => {
@@ -71,6 +71,7 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
     pendingBargeInRef.current = false;
     finalizedTranscriptRef.current = "";
     pendingSpeechRef.current = [];
+    shouldEndCallRef.current = false;
     micMutedRef.current = false;
     setMicMutedRaw(false);
     setSpeakerMutedRaw(false);
@@ -145,6 +146,7 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
             ttsSentenceBufferRef.current = "";
           }
           assistantMessageIdRef.current = null;
+          if (event.data?.conversation_ended) shouldEndCallRef.current = true;
           break;
         }
 
@@ -320,6 +322,13 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
       ttsRef.current = connectTTS(session.tts, session.deepgram_token, {
         onAudioStarted: () => setCallState(VOICE_CALL_STATE.SPEAKING),
         onAudioCompleted: () => {
+          // The farewell just finished playing — hang up automatically
+          // rather than sitting in "Listening…" waiting for nothing.
+          if (shouldEndCallRef.current) {
+            shouldEndCallRef.current = false;
+            endCall();
+            return;
+          }
           if (callStateRef.current !== VOICE_CALL_STATE.ERROR) setCallState(VOICE_CALL_STATE.LISTENING);
           // Barge-in was off and the customer talked while we were still
           // speaking — now that we're done, process what they said.
