@@ -144,22 +144,52 @@ class BusinessLookupService:
         services = (
             self.db.query(Service)
             .filter(Service.business_id == business.id)
-            .order_by(Service.name)
+            .order_by(Service.category, Service.name)
             .all()
         )
         if not services:
             return None
+
+        categorized = [s for s in services if s.category]
+        uncategorized = [s for s in services if not s.category]
+
+        # With real categories set up, surface those first (a customer
+        # should see "Hair, Skin, Nails" before a flat 20-item list) - the
+        # agent's prompt then decides whether to name every category or
+        # drill into one the customer already asked about.
+        if categorized:
+            by_category: dict[str, list[Service]] = {}
+            for s in categorized:
+                by_category.setdefault(s.category, []).append(s)
+            lines = [f"Categories: {', '.join(by_category.keys())}"]
+            for category, items in by_category.items():
+                item_bits = []
+                for s in items[:8]:
+                    bits = [s.name]
+                    if s.price is not None:
+                        bits.append(f"starting from \u20b9{s.price:g}")
+                    if s.duration_minutes:
+                        bits.append(f"{s.duration_minutes} min")
+                    item_bits.append(" \u2014 ".join(bits))
+                lines.append(f"{category}:\n" + "\n".join(item_bits))
+            if uncategorized:
+                lines.append(
+                    "Other:\n"
+                    + "\n".join(s.name for s in uncategorized[:8])
+                )
+            return "\n\n".join(lines)
+
         shown = services[:8]
         lines = []
         for s in shown:
             bits = [s.name]
             if s.price is not None:
-                bits.append(f"\u20b9{s.price:g}")
+                bits.append(f"starting from \u20b9{s.price:g}")
             if s.duration_minutes:
                 bits.append(f"{s.duration_minutes} min")
-            lines.append(" — ".join(bits))
+            lines.append(" \u2014 ".join(bits))
         note = (
-            f"\n(+{len(services) - 8} more not shown — ask about a specific service or category)"
+            f"\n(+{len(services) - 8} more not shown \u2014 ask about a specific service or category)"
             if len(services) > 8
             else ""
         )
@@ -176,7 +206,10 @@ class BusinessLookupService:
         )
         if not staff:
             return None
-        return "Team: " + ", ".join(s.name for s in staff[:12])
+        lines = []
+        for s in staff[:12]:
+            lines.append(f"{s.name} \u2014 {s.specialty}" if s.specialty else s.name)
+        return "Team:\n" + "\n".join(lines)
 
     def _match_faq(self, business, tokens: set[str], raw_question: str) -> str | None:
         faqs = self.db.query(FAQ).filter(FAQ.business_id == business.id).all()
@@ -208,7 +241,7 @@ class BusinessLookupService:
         return None
 
     def answer(self, business, question: str, include_catalog: bool = True) -> str | None:
-
+        
         if business is None:
             return None
         tokens = _tokenize(question)

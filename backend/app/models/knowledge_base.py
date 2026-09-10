@@ -30,6 +30,7 @@ class Service(Base):
     business_id: Mapped[str] = mapped_column(String(16), ForeignKey("business.id"))
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
+    category: Mapped[str] = mapped_column(String(120), nullable=True)
     price: Mapped[float] = mapped_column(Numeric(10, 2, asdecimal=False), nullable=True)
     duration_minutes: Mapped[int] = mapped_column(nullable=True)
 

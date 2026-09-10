@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     keyword_boost_weight: float = 0.3
     relevance_score_threshold: float = 0.1
 
+    # Booking flows often run 15-20+ turns (service, date, time-of-day,
+    # slot, corrections, name, phone, confirm). Too small a window here
+    # means the agent can literally lose the service/date it confirmed
+    # earlier in the SAME booking and have to re-ask from scratch.
     max_history_exchanges: int = 16
 
     cancellation_window_hours: int = 24
@@ -67,12 +71,10 @@ class Settings(BaseSettings):
     voice_max_call_seconds: int = 900
     
     openrouter_api_key: str | None = ""
-    openrouter_model: str = "openai/gpt-oss-120b"   # or any OpenRouter model slug
-    # Lower = stricter/more deterministic. Agent tool-calling (booking/knowledge)
-    # is grounded in tool results, not creative writing, so keep this low to
-    # cut down on hallucinated/inconsistent replies.
+    openrouter_model: str = "openai/gpt-oss-120b"  
+    openrouter_fast_model: str = ""
     openrouter_temperature: float = 0.3
-    openrouter_max_tokens: int = 1024
+    openrouter_max_tokens: int = 500
     openrouter_site_url: str = ""
     openrouter_site_name: str = ""
 

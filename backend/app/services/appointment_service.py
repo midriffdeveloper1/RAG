@@ -407,7 +407,7 @@ class AppointmentService:
 
         distinct_times = sorted(slots_by_time.keys())
         truncated = False
-        max_slots = 8
+        max_slots = 3
         if len(distinct_times) > max_slots:
             truncated = True
             last_index = len(distinct_times) - 1

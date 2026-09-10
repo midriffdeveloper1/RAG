@@ -84,7 +84,10 @@ _CLOSING_RESPONSE_PATTERN = re.compile(
 
 
 def _is_conversation_ending(question: str, history: list[ChatTurn]) -> bool:
-   
+    """Cheap, conservative check - no LLM call needed. A bare "bye" always
+    counts; a bare "no"/"that's all" only counts right after the assistant
+    itself asked something like "anything else?", so an ordinary "no"
+    mid-task never gets misread as the customer leaving."""
     stripped = question.strip()
     if not stripped:
         return False
@@ -191,7 +194,7 @@ class OrchestratorService:
             else f"Latest message: {question}"
         )
         try:
-            data = self.llm.generate_json(_TURN_CLASSIFIER_SYSTEM_PROMPT, user_prompt, max_tokens=300, temperature=0)
+            data = self.llm.generate_json(_TURN_CLASSIFIER_SYSTEM_PROMPT, user_prompt, max_tokens=250, temperature=0, fast=True)
             escalate = bool(data.get("escalate"))
             intent = data.get("intent")
             if intent not in ("booking", "knowledge"):
@@ -207,7 +210,7 @@ class OrchestratorService:
             return name, phone
 
         try:
-            data = self.llm.generate_json(_CONTACT_EXTRACTION_SYSTEM_PROMPT, message, max_tokens=150, temperature=0)
+            data = self.llm.generate_json(_CONTACT_EXTRACTION_SYSTEM_PROMPT, message, max_tokens=200, temperature=0, fast=True)
 
             def _clean(value):
                 if not isinstance(value, str):
@@ -390,7 +393,7 @@ class OrchestratorService:
                 "they're most interested in rather than reading everything."
             )
         try:
-            rephrased = self.llm.generate(system_prompt, raw_answer, max_tokens=220, temperature=0.7)
+            rephrased = self.llm.generate(system_prompt, raw_answer, max_tokens=220, temperature=0.7, fast=True)
             rephrased = _dedupe_repeated_sentences((rephrased or "").strip())
             if rephrased and _looks_complete(rephrased):
                 return rephrased
@@ -421,7 +424,6 @@ class OrchestratorService:
 
         reason = self.support.check_message(question) or self.support.check_streak(session)
         intent = None
-
 
         last_assistant_agent = next((t.agent for t in reversed(history) if t.role == "assistant"), None)
         in_active_booking = last_assistant_agent == "booking"

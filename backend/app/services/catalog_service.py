@@ -76,6 +76,7 @@ class StaffCatalogService:
             name=payload.name,
             email=payload.email,
             phone=payload.phone,
+            specialty=payload.specialty,
             is_active=payload.is_active,
         )
         staff.services = self._resolve_services(payload.service_ids)
