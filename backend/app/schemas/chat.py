@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class ChatTurn(BaseModel):
     role: Literal["user", "assistant"]
     content: str
+    agent: Optional[str] = None
 
 
 class ChatRequest(BaseModel):
@@ -41,3 +42,4 @@ class ChatResponse(BaseModel):
     needs_human: bool = False
     agent: Optional[str] = None
     ticket_number: Optional[str] = None
+    conversation_ended: bool = False

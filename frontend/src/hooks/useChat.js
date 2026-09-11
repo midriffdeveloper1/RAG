@@ -8,8 +8,10 @@ const WELCOME_MESSAGE = {
   content: "Hi! Ask me anything about our services, hours, pricing, or policies.",
 };
 
-export function useChat(sessionId, customerEmail, { onSessionCreated } = {}) {
-  const [messages, setMessages] = useState([WELCOME_MESSAGE]);
+export function useChat(sessionId, customerEmail, { onSessionCreated, initialMessages } = {}) {
+  
+  const initialMessagesRef = useRef(initialMessages ?? [WELCOME_MESSAGE]);
+  const [messages, setMessages] = useState(initialMessagesRef.current);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState(null);
@@ -21,7 +23,7 @@ export function useChat(sessionId, customerEmail, { onSessionCreated } = {}) {
 
   const refresh = useCallback(() => {
     if (!sessionId || !customerEmail) {
-      setMessages([WELCOME_MESSAGE]);
+      setMessages(initialMessagesRef.current);
       return;
     }
     setIsLoadingHistory(true);

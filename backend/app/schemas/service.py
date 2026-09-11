@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 class ServiceBase(BaseModel):
     name: str
     description: str | None = None
+    category: str | None = None
     price: float = Field(ge=0)
     duration_minutes: int = Field(gt=0)
 
@@ -15,6 +16,7 @@ class ServiceCreate(ServiceBase):
 class ServiceUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
+    category: str | None = None
     price: float | None = Field(default=None, ge=0)
     duration_minutes: int | None = Field(default=None, gt=0)
 
@@ -23,6 +25,7 @@ class ServiceOut(BaseModel):
     id: str
     name: str
     description: str | None = None
+    category: str | None = None
     price: float | None = None
     duration_minutes: int | None = None
 

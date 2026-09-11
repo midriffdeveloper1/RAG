@@ -132,6 +132,9 @@ class LLMService:
         )
 
         self.model = settings.openrouter_model
+        # Falls back to the main model when no fast model is configured, so
+        # this is always safe to use even on a fresh install.
+        self.fast_model = settings.openrouter_fast_model or settings.openrouter_model
 
     def generate(
         self,
@@ -139,9 +142,10 @@ class LLMService:
         user_prompt: str,
         max_tokens: int | None = None,
         temperature: float | None = None,
+        fast: bool = False,
     ) -> str:
         response = self.client.chat.completions.create(
-            model=self.model,
+            model=self.fast_model if fast else self.model,
             temperature=(
                 settings.openrouter_temperature
                 if temperature is None
@@ -166,9 +170,10 @@ class LLMService:
         user_prompt: str,
         max_tokens: int | None = None,
         temperature: float | None = None,
+        fast: bool = False,
     ) -> dict[str, Any]:
         response = self.client.chat.completions.create(
-            model=self.model,
+            model=self.fast_model if fast else self.model,
             temperature=(
                 settings.openrouter_temperature
                 if temperature is None

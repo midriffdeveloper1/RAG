@@ -7,6 +7,7 @@ class StaffBase(BaseModel):
     name: str
     email: str | None = None
     phone: str | None = None
+    specialty: str | None = None
     is_active: bool = True
 
 
@@ -18,6 +19,7 @@ class StaffUpdate(BaseModel):
     name: str | None = None
     email: str | None = None
     phone: str | None = None
+    specialty: str | None = None
     is_active: bool | None = None
     service_ids: list[str] | None = None
 

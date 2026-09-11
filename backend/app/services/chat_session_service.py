@@ -58,7 +58,7 @@ class ChatSessionService:
             .order_by(ChatMessage.created_at.asc())
             .all()
         )
-        turns = [ChatTurn(role=r.role, content=r.content) for r in rows]
+        turns = [ChatTurn(role=r.role, content=r.content, agent=r.agent) for r in rows]
         limit = max_exchanges * 2
         return turns[-limit:] if limit else turns
 

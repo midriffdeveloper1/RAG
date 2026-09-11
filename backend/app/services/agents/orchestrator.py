@@ -8,6 +8,7 @@ from app.models.chat_session import ChatMessage, ChatSession
 from app.models.customer import Customer
 from app.schemas.chat import ChatResponse, ChatTurn
 from app.services.agents.booking_agent import BookingAgent
+from app.services.agents.tool_loop import _dedupe_repeated_sentences
 from app.services.agents.knowledge_agent import KnowledgeAgent
 from app.services.agents.support_agent import SupportAgent
 from app.services.business_lookup_service import BusinessLookupService
@@ -32,7 +33,8 @@ _KNOWLEDGE_KEYWORDS = {
 
 _TURN_CLASSIFIER_SYSTEM_PROMPT = """Routing classifier for a salon assistant. Given the latest customer message (with context), output JSON:
 {"escalate": true|false, "intent": "booking"|"knowledge"}
-escalate=true only if they clearly ask for a human/manager/ticket, or show real anger/frustration (not mild "no"). intent="booking" for availability/booking/reschedule/cancel/their own appointment; else "knowledge". Fill intent either way. JSON only."""
+escalate=true ONLY if they clearly ask for a human/manager/ticket, or show real anger/frustration (not mild "no"). If unsure, escalate=false.
+intent="booking" for availability/booking/reschedule/cancel/their own appointment/picking a date or time in an ongoing booking; intent="knowledge" for anything about the business itself (services, pricing, hours, policies, location). If genuinely ambiguous, prefer whichever intent matches the most recent conversation turns. Always fill intent with one of these two values, even when escalate=true. Output strict JSON only, no other text."""
 
 _HUMANIZE_SYSTEM_PROMPT = """You're {business_name}'s front-desk assistant, texting a customer. Reword the given fact briefly and naturally, like a real person would — no markdown tables, no internal jargon. If it's a repetitive pattern (e.g. the same hours across several days), summarize it in one sentence instead of listing each day. If it's a list of distinct items (e.g. services with prices, staff names), keep it as a short clean list — don't compress away the actual items customers need to choose from. Never add/remove/change facts. Vary phrasing. Don't mention "the database" or that you're rephrasing."""
 
@@ -59,6 +61,42 @@ _NEEDS_LLM_REVIEW_PATTERN = re.compile(
     r"worst|connect|ticket|human|person|manager|supervisor)\b",
     re.IGNORECASE,
 )
+
+_FAREWELL_PATTERN = re.compile(
+    r"\b(bye|goodbye|good\s*bye|take\s*care|have\s*a\s*(good|great|nice)\s*(day|one))\b",
+    re.IGNORECASE,
+)
+_WRAP_UP_PROMPT_PATTERN = re.compile(
+    r"(anything else|something else|else i can help|help (you )?with anything else|"
+    r"need anything else|else you('d| would) like|further (help|assistance)|"
+    r"else i can (do|assist))",
+    re.IGNORECASE,
+)
+_CLOSING_FRAGMENT = (
+    r"(?:no+p{0,2}e?|nothing(?:\s*else)?|(?:that'?s|that is)\s*(?:all|it)|"
+    r"i'?m\s*(?:good|done|all\s*set)|all\s*good|thanks?|thank\s*you|"
+    r"that(?:'ll| will) be all|no\s*more(?:\s*questions)?|we'?re\s*(?:good|done))"
+)
+_CLOSING_RESPONSE_PATTERN = re.compile(
+    rf"^\s*{_CLOSING_FRAGMENT}(?:\s*[,.]?\s*(?:and\s*)?{_CLOSING_FRAGMENT})*\s*[.!]?\s*$",
+    re.IGNORECASE,
+)
+
+
+def _is_conversation_ending(question: str, history: list[ChatTurn]) -> bool:
+    """Cheap, conservative check - no LLM call needed. A bare "bye" always
+    counts; a bare "no"/"that's all" only counts right after the assistant
+    itself asked something like "anything else?", so an ordinary "no"
+    mid-task never gets misread as the customer leaving."""
+    stripped = question.strip()
+    if not stripped:
+        return False
+    if _FAREWELL_PATTERN.search(stripped):
+        return True
+    if not _CLOSING_RESPONSE_PATTERN.match(stripped):
+        return False
+    last_assistant = next((t.content for t in reversed(history) if t.role == "assistant"), None)
+    return bool(last_assistant and _WRAP_UP_PROMPT_PATTERN.search(last_assistant))
 
 
 def _fast_route_intent(question: str) -> str | None:
@@ -156,18 +194,11 @@ class OrchestratorService:
             else f"Latest message: {question}"
         )
         try:
-            data = self.llm.generate_json(_TURN_CLASSIFIER_SYSTEM_PROMPT, user_prompt, max_tokens=300, temperature=0)
-            print("*"*50)
-            print(data)
-            print("*"*50)
+            data = self.llm.generate_json(_TURN_CLASSIFIER_SYSTEM_PROMPT, user_prompt, max_tokens=200, temperature=0, fast=True)
             escalate = bool(data.get("escalate"))
             intent = data.get("intent")
             if intent not in ("booking", "knowledge"):
                 intent = _classify_intent_keywords(question, history)
-                print("*"*50)
-                print(intent)
-                print("*"*50)
-                
             return escalate, intent
         except Exception:
             logger.exception("LLM turn classification failed; falling back to keyword routing")
@@ -179,7 +210,7 @@ class OrchestratorService:
             return name, phone
 
         try:
-            data = self.llm.generate_json(_CONTACT_EXTRACTION_SYSTEM_PROMPT, message, max_tokens=150, temperature=0)
+            data = self.llm.generate_json(_CONTACT_EXTRACTION_SYSTEM_PROMPT, message, max_tokens=200, temperature=0, fast=True)
 
             def _clean(value):
                 if not isinstance(value, str):
@@ -242,6 +273,26 @@ class OrchestratorService:
         return ChatResponse(
             answer=reply, sources=[], session_id=session.id, needs_human=True, agent="support",
             ticket_number=session.ticket_number,
+        )
+
+    def _handle_conversation_end(
+        self, session: ChatSession, sessions: ChatSessionService, persist: bool
+    ) -> ChatResponse:
+        from app.models.knowledge_base import Business
+
+        business = self.db.query(Business).first()
+        business_name = (business.name if business and business.name else None) or "us"
+        farewell = f"Thanks so much for reaching out to {business_name} \u2014 have a wonderful day!"
+        session.unresolved_streak = 0
+        session.updated_at = datetime.utcnow()
+        self.db.commit()
+        if persist:
+            sessions.append_message(
+                session, "assistant", farewell, agent="farewell", channel=self.channel, message_type="assistant_text"
+            )
+        return ChatResponse(
+            answer=farewell, sources=[], session_id=session.id, needs_human=False, agent="farewell",
+            conversation_ended=True,
         )
 
     def _finalize_escalation(
@@ -327,7 +378,7 @@ class OrchestratorService:
         business = self.db.query(Business).first()
         if business is None:
             return None
-        return BusinessLookupService(self.db).answer(business, question)
+        return BusinessLookupService(self.db).answer(business, question, include_catalog=False)
 
     def _humanize_fast_answer(self, raw_answer: str) -> str:
         from app.models.knowledge_base import Business
@@ -342,8 +393,8 @@ class OrchestratorService:
                 "they're most interested in rather than reading everything."
             )
         try:
-            rephrased = self.llm.generate(system_prompt, raw_answer, max_tokens=220, temperature=0.7)
-            rephrased = (rephrased or "").strip()
+            rephrased = self.llm.generate(system_prompt, raw_answer, max_tokens=220, temperature=0.7, fast=True)
+            rephrased = _dedupe_repeated_sentences((rephrased or "").strip())
             if rephrased and _looks_complete(rephrased):
                 return rephrased
             if rephrased:
@@ -368,9 +419,16 @@ class OrchestratorService:
         if session.awaiting_contact_info:
             return self._handle_pending_escalation(question, session, sessions, tickets, persist)
 
+        if _is_conversation_ending(question, history):
+            return self._handle_conversation_end(session, sessions, persist)
+
         reason = self.support.check_message(question) or self.support.check_streak(session)
         intent = None
-        if not reason:
+
+        last_assistant_agent = next((t.agent for t in reversed(history) if t.role == "assistant"), None)
+        in_active_booking = last_assistant_agent == "booking"
+
+        if not reason and not in_active_booking:
             intent = _fast_route_intent(question)
 
         if not reason and intent is None:
@@ -378,7 +436,7 @@ class OrchestratorService:
             if escalate:
                 reason = "Customer indicated they want a human, or showed clear frustration (LLM-detected)."
 
-        if not reason and intent == "knowledge":
+        if not reason and intent == "knowledge" and not in_active_booking:
             fast_answer = self._try_fast_knowledge_answer(question)
             if fast_answer:
                 fast_answer = self._humanize_fast_answer(fast_answer)

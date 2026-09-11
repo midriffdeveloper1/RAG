@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models.customer import Customer
+from app.services.time_utils import format_display_date
 
 settings = get_settings()
 
@@ -47,8 +48,15 @@ def tone_instructions(cfg: dict) -> str:
 
 
 def date_reference_table(days_ahead: int = 8) -> str:
+    """Each entry gives BOTH the ISO date (for tool calls, e.g. 'date':
+    'YYYY-MM-DD') and the display date in parentheses (what to actually say
+    or type to the customer, e.g. '9 Sep, 2026') — never speak/write the raw
+    ISO date or spell it out digit-by-digit."""
     today = date.today()
-    lines = [f"Today={today.strftime('%a')} {today.isoformat()}", f"Tomorrow={(today + timedelta(days=1)).isoformat()}"]
+    lines = [
+        f"Today={today.strftime('%a')} {today.isoformat()} ({format_display_date(today)})",
+        f"Tomorrow={(today + timedelta(days=1)).isoformat()} ({format_display_date(today + timedelta(days=1))})",
+    ]
     seen_weekdays: set[str] = set()
     for offset in range(2, days_ahead + 1):
         d = today + timedelta(days=offset)
@@ -56,7 +64,7 @@ def date_reference_table(days_ahead: int = 8) -> str:
         if weekday in seen_weekdays:
             continue
         seen_weekdays.add(weekday)
-        lines.append(f"{weekday}={d.isoformat()}")
+        lines.append(f"{weekday}={d.isoformat()} ({format_display_date(d)})")
     return " | ".join(lines)
 
 

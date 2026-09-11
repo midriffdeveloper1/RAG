@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.models.chat_session import ChatSession
 from app.realtime.events import RealtimeEvent, RealtimeEventType
+from app.services.agents.shared_context import admin_config
+from app.services.chat_session_service import ChatSessionService
 from app.services.conversation_service import ConversationService
 
 logger = logging.getLogger(__name__)
@@ -26,6 +28,26 @@ def _chunk_for_delta(text: str) -> Iterator[str]:
         words = sentence.split(" ")
         for i in range(0, len(words), _WORDS_PER_DELTA):
             yield " ".join(words[i : i + _WORDS_PER_DELTA]) + " "
+
+
+def greeting_turn(db: Session, session: ChatSession, channel: str = "voice") -> Iterator[RealtimeEvent]:
+
+    cfg = admin_config(db)
+    business_name = (cfg.get("business_name") or "").strip() or "our business"
+    greeting = f"Hi there! Welcome to {business_name}. How can I help you today?"
+
+    yield RealtimeEvent(type=RealtimeEventType.ASSISTANT_RESPONSE_STARTED)
+    for delta in _chunk_for_delta(greeting):
+        yield RealtimeEvent(type=RealtimeEventType.ASSISTANT_TEXT_DELTA, data={"delta": delta})
+    yield RealtimeEvent(
+        type=RealtimeEventType.ASSISTANT_TEXT_COMPLETED,
+        data={"text": greeting, "needs_human": False, "ticket_number": None, "agent": "greeting"},
+    )
+
+    ChatSessionService(db).append_message(
+        session, "assistant", greeting, agent="greeting", channel=channel, message_type="assistant_text"
+    )
+    db.commit()
 
 
 def stream_turn(
@@ -71,5 +93,6 @@ def stream_turn(
             "needs_human": response.needs_human,
             "ticket_number": response.ticket_number,
             "agent": response.agent,
+            "conversation_ended": response.conversation_ended,
         },
     )

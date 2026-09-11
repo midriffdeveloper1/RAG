@@ -9,6 +9,7 @@ import { useChatSessions } from "../hooks/useChatSessions.js";
 export default function Home() {
   const { customer, isIdentified, lastGreeting, clearGreeting, switchAccount } = useCustomer();
   const [activeSessionId, setActiveSessionId] = useState(null);
+  const [resetToken, setResetToken] = useState(0);
   const { sessions, isLoading, refresh, remove } = useChatSessions(customer?.email);
 
   const handleSessionCreated = useCallback(
@@ -19,7 +20,10 @@ export default function Home() {
     [refresh]
   );
 
-  const handleNew = useCallback(() => setActiveSessionId(null), []);
+  const handleNew = useCallback(() => {
+    setActiveSessionId(null);
+    setResetToken((t) => t + 1);
+  }, []);
 
   const handleDelete = useCallback(
     async (sessionId) => {
@@ -60,6 +64,7 @@ export default function Home() {
 
       <div className="home-page__chat-area">
         <ChatWidget
+          key={resetToken}
           sessionId={activeSessionId}
           customerEmail={customer?.email}
           onSessionCreated={handleSessionCreated}

@@ -1,4 +1,3 @@
-
 const STT_SAMPLE_RATE = 16000;
 const TTS_SAMPLE_RATE = 24000;
 const SOCKET_TIMEOUT_MS = 8000;
@@ -220,7 +219,11 @@ export function waitForSocketOpen(socket, label = "WebSocket", timeoutMs = SOCKE
 }
 
 /** Opens a Deepgram streaming STT connection. */
-export function connectSTT(streamConfig, token, { onPartial, onFinal, onSpeechStarted, onError, onOpen } = {}) {
+export function connectSTT(
+  streamConfig,
+  token,
+  { onPartial, onFinal, onSpeechStarted, onUtteranceEnd, onError, onOpen } = {}
+) {
   const url = new URL(streamConfig.url);
   Object.entries(streamConfig.params || {}).forEach(([key, value]) => url.searchParams.set(key, value));
 
@@ -246,12 +249,19 @@ export function connectSTT(streamConfig, token, { onPartial, onFinal, onSpeechSt
       onSpeechStarted?.();
       return;
     }
+    if (message.type === "UtteranceEnd") {
+      // Fallback finalize signal — fires from word-timing gaps even if a
+      // `speech_final` Results message never arrived, so we never get
+      // stuck "listening" and force the customer to repeat themselves.
+      onUtteranceEnd?.();
+      return;
+    }
     if (message.type !== "Results") return;
     const transcript = message.channel?.alternatives?.[0]?.transcript || "";
-    if (!transcript) return;
+    if (!transcript && !message.speech_final) return;
     if (message.is_final) {
       onFinal?.(transcript, Boolean(message.speech_final));
-    } else {
+    } else if (transcript) {
       onPartial?.(transcript);
     }
   };
@@ -340,6 +350,10 @@ class PCMPlaybackQueue {
     this.onStarted = onStarted;
     this.onCompleted = onCompleted;
     this.started = false;
+    // Routed through a gain node (instead of straight to destination) so
+    // the speaker can be muted/unmuted without tearing down playback.
+    this.outputGain = this.audioContext.createGain();
+    this.outputGain.connect(this.audioContext.destination);
   }
 
   enqueue(arrayBuffer) {
@@ -354,7 +368,7 @@ class PCMPlaybackQueue {
 
     const source = this.audioContext.createBufferSource();
     source.buffer = buffer;
-    source.connect(this.audioContext.destination);
+    source.connect(this.outputGain);
 
     const startAt = Math.max(this.audioContext.currentTime, this.nextStartTime);
     source.start(startAt);
@@ -375,6 +389,12 @@ class PCMPlaybackQueue {
     setTimeout(() => {
       if (!this.activeSources.length) this.onCompleted?.();
     }, Math.max(remaining, 0) * 1000 + 50);
+  }
+
+  /** Loudspeaker toggle — mutes/unmutes output without affecting the
+   * underlying call (the assistant keeps "talking" and transcribing). */
+  setMuted(muted) {
+    this.outputGain.gain.value = muted ? 0 : 1;
   }
 
   /** Barge-in: immediately stop whatever's currently playing/queued. */

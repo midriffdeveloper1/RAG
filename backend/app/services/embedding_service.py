@@ -14,13 +14,17 @@ class EmbeddingService:
         self.model_name = model_name or settings.embedding_model_name
         logger.info("Loading embedding model: %s", self.model_name)
         self._model = SentenceTransformer(self.model_name)
-     
+
     @property
     def dimension(self) -> int:
         return self._model.get_sentence_embedding_dimension()
 
     def embed_text(self, text: str) -> list[float]:
-        return self._model.encode(text, normalize_embeddings=True).tolist()
+        return list(self._embed_text_cached(text.strip().lower()))
+
+    @lru_cache(maxsize=512)
+    def _embed_text_cached(self, normalized_text: str) -> tuple[float, ...]:
+        return tuple(self._model.encode(normalized_text, normalize_embeddings=True).tolist())
 
     def embed_batch(self, texts: list[str], batch_size: int | None = None) -> list[list[float]]:
         batch_size = batch_size or settings.embedding_batch_size

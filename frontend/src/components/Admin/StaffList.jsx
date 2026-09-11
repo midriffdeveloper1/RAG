@@ -83,15 +83,17 @@ export default function StaffList({ services = [] }) {
           <div className="data-table-wrapper">
             <table className="data-table">
               <colgroup>
+                <col style={{ width: "15%" }} />
+                <col style={{ width: "18%" }} />
                 <col style={{ width: "17%" }} />
-                <col style={{ width: "20%" }} />
-                <col style={{ width: "38%" }} />
+                <col style={{ width: "25%" }} />
                 <col style={{ width: "10%" }} />
                 <col style={{ width: "15%" }} />
               </colgroup>
               <thead>
                 <tr>
                   <th>Name</th>
+                  <th>Specialty</th>
                   <th>Contact</th>
                   <th>Services</th>
                   <th>Status</th>
@@ -102,6 +104,7 @@ export default function StaffList({ services = [] }) {
                 {staff.map((member) => (
                   <tr key={member.id}>
                     <td className="data-table__primary">{member.name}</td>
+                    <td>{member.specialty || "—"}</td>
                     <td>
                       <span className="data-table__secondary">{member.email || "—"}</span>
                       <span className="data-table__secondary">{member.phone || "—"}</span>

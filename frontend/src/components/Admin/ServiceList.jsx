@@ -63,15 +63,17 @@ export default function ServiceList() {
           <div className="data-table-wrapper">
             <table className="data-table">
               <colgroup>
-                <col style={{ width: "20%" }} />
-                <col style={{ width: "40%" }} />
+                <col style={{ width: "18%" }} />
                 <col style={{ width: "13%" }} />
+                <col style={{ width: "32%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "12%" }} />
                 <col style={{ width: "13%" }} />
-                <col style={{ width: "14%" }} />
               </colgroup>
               <thead>
                 <tr>
                   <th>Name</th>
+                  <th>Category</th>
                   <th>Description</th>
                   <th>Price</th>
                   <th>Duration</th>
@@ -82,6 +84,7 @@ export default function ServiceList() {
                 {services.map((service) => (
                   <tr key={service.id}>
                     <td className="data-table__primary">{service.name}</td>
+                    <td>{service.category || "—"}</td>
                     <td>{service.description || "—"}</td>
                     <td>{service.price != null ? `₹${service.price}` : "Not set"}</td>
                     <td>{service.duration_minutes != null ? `${service.duration_minutes} min` : "Not set"}</td>

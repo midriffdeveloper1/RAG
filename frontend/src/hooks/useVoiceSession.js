@@ -15,9 +15,6 @@ export const VOICE_CALL_STATE = {
 };
 
 const SENTENCE_END = /[.!?]\s*$/;
-// A VAD "speech started" blip alone (fans, typing, background chatter) is
-// not enough to justify cutting the assistant off — we wait for an actual
-// transcribed partial with real content before treating it as barge-in.
 const MIN_BARGE_IN_CHARS = 2;
 
 function toWsUrl(relativePath) {
@@ -26,19 +23,13 @@ function toWsUrl(relativePath) {
   return `${wsProtocol}//${apiBase.host}${relativePath}`;
 }
 
-/**
- * Runs one voice call. `chat` is a useChat instance dedicated to the voice
- * conversation (its own session id, separate from any text chat) — the
- * voice layer writes into it via appendMessage/updateMessage.
- *
- * `bargeInEnabled` (from admin settings) controls whether the customer's
- * voice can interrupt the assistant mid-reply; when false the assistant
- * always finishes speaking.
- */
 export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreated, bargeInEnabled = true }) {
   const [callState, setCallStateRaw] = useState(VOICE_CALL_STATE.IDLE);
   const [error, setError] = useState(null);
+  const [micMuted, setMicMutedRaw] = useState(false);
+  const [speakerMuted, setSpeakerMutedRaw] = useState(false);
   const callStateRef = useRef(VOICE_CALL_STATE.IDLE);
+  const micMutedRef = useRef(false);
 
   const setCallState = useCallback((next) => {
     callStateRef.current = next;
@@ -54,6 +45,9 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
   const assistantBufferRef = useRef("");
   const ttsSentenceBufferRef = useRef("");
   const pendingBargeInRef = useRef(false);
+  const pendingSpeechRef = useRef([]);
+  const shouldEndCallRef = useRef(false);
+  const finalizedTranscriptRef = useRef("");
 
   const cleanup = useCallback(async () => {
     if (stopMicRef.current) {
@@ -75,12 +69,40 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
     assistantBufferRef.current = "";
     ttsSentenceBufferRef.current = "";
     pendingBargeInRef.current = false;
+    finalizedTranscriptRef.current = "";
+    pendingSpeechRef.current = [];
+    shouldEndCallRef.current = false;
+    micMutedRef.current = false;
+    setMicMutedRaw(false);
+    setSpeakerMutedRaw(false);
+  }, []);
+
+  /** Mic mute — the mic keeps capturing (avoids re-negotiating the device),
+   * we just stop forwarding frames to STT while muted. */
+  const toggleMic = useCallback(() => {
+    micMutedRef.current = !micMutedRef.current;
+    setMicMutedRaw(micMutedRef.current);
+  }, []);
+
+  /** Loudspeaker mute — silences assistant audio without pausing the call. */
+  const toggleSpeaker = useCallback(() => {
+    setSpeakerMutedRaw((prev) => {
+      const next = !prev;
+      ttsRef.current?.playback?.setMuted(next);
+      return next;
+    });
   }, []);
 
   const speakSentence = useCallback((sentence) => {
     const text = sentence.trim();
+    if (!text) return;
     const socket = ttsRef.current?.socket;
-    if (!text || socket?.readyState !== WebSocket.OPEN) return;
+    if (socket?.readyState !== WebSocket.OPEN) {
+      // TTS isn't connected yet (e.g. the call-start greeting arrives
+      // before setup finishes) — queue it, flushed once the socket opens.
+      pendingSpeechRef.current.push(text);
+      return;
+    }
     socket.send(JSON.stringify({ type: "Speak", text }));
     socket.send(JSON.stringify({ type: "Flush" }));
   }, []);
@@ -124,6 +146,7 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
             ttsSentenceBufferRef.current = "";
           }
           assistantMessageIdRef.current = null;
+          if (event.data?.conversation_ended) shouldEndCallRef.current = true;
           break;
         }
 
@@ -190,6 +213,7 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
       const pcmQueue = [];
       stopMicRef.current = await startMicCapture(
         (pcm) => {
+          if (micMutedRef.current) return;
           if (sttSocket?.readyState === WebSocket.OPEN) {
             sttSocket.send(pcm);
           } else if (pcmQueue.length < 100) {
@@ -206,13 +230,41 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
         }
       );
 
+      const displayTranscript = (partial = "") => {
+        const combined = [finalizedTranscriptRef.current, partial].filter(Boolean).join(" ").trim();
+        if (!combined) return;
+        if (!userMessageIdRef.current) {
+          userMessageIdRef.current = chat.appendMessage("user", combined, { channel: "voice" });
+        } else {
+          chat.updateMessage(userMessageIdRef.current, combined);
+        }
+      };
+
+      const sendFinalTranscript = () => {
+        const text = finalizedTranscriptRef.current.trim();
+        if (!text || controlSocket.readyState !== WebSocket.OPEN) {
+          finalizedTranscriptRef.current = "";
+          userMessageIdRef.current = null;
+          return;
+        }
+        if (!bargeInEnabled && callStateRef.current === VOICE_CALL_STATE.SPEAKING) {
+          return;
+        }
+        finalizedTranscriptRef.current = "";
+        pendingBargeInRef.current = false;
+        setCallState(VOICE_CALL_STATE.PROCESSING);
+        controlSocket.send(
+          JSON.stringify({
+            type: "user.transcript.final",
+            data: { text, customer_email: customerEmail || null },
+          })
+        );
+        userMessageIdRef.current = null;
+      };
+
       sttSocket = connectSTT(session.stt, session.deepgram_token, {
         onPartial: (text) => {
-          if (!userMessageIdRef.current) {
-            userMessageIdRef.current = chat.appendMessage("user", text, { channel: "voice" });
-          } else {
-            chat.updateMessage(userMessageIdRef.current, text);
-          }
+          displayTranscript(text);
           // Confirmed real speech (not just a VAD blip) — now it's safe to
           // actually cut the assistant off, if barge-in is allowed.
           if (pendingBargeInRef.current && bargeInEnabled && text.trim().length >= MIN_BARGE_IN_CHARS) {
@@ -222,22 +274,22 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
           }
         },
         onFinal: (text, speechFinal) => {
-          if (!userMessageIdRef.current) {
-            userMessageIdRef.current = chat.appendMessage("user", text, { channel: "voice" });
-          } else {
-            chat.updateMessage(userMessageIdRef.current, text);
+          // Accumulate — a single utterance often arrives as several
+          // `is_final` chunks, and only the last carries `speech_final`.
+          if (text.trim()) {
+            finalizedTranscriptRef.current = [finalizedTranscriptRef.current, text.trim()]
+              .filter(Boolean)
+              .join(" ");
           }
-          if (speechFinal && text.trim() && controlSocket.readyState === WebSocket.OPEN) {
-            pendingBargeInRef.current = false;
-            setCallState(VOICE_CALL_STATE.PROCESSING);
-            controlSocket.send(
-              JSON.stringify({
-                type: "user.transcript.final",
-                data: { text: text.trim(), customer_email: customerEmail || null },
-              })
-            );
-            userMessageIdRef.current = null;
-          }
+          displayTranscript();
+          if (speechFinal) sendFinalTranscript();
+        },
+        onUtteranceEnd: () => {
+          // Fallback: word-timing gap detected with no `speech_final` —
+          // still finalize whatever we've accumulated so the call never
+          // gets stuck waiting and the customer never has to repeat
+          // themselves for no visible reason.
+          if (finalizedTranscriptRef.current.trim()) sendFinalTranscript();
         },
         onSpeechStarted: () => {
           // VAD fired — this alone might just be background noise, so we
@@ -270,11 +322,29 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
       ttsRef.current = connectTTS(session.tts, session.deepgram_token, {
         onAudioStarted: () => setCallState(VOICE_CALL_STATE.SPEAKING),
         onAudioCompleted: () => {
+          // The farewell just finished playing — hang up automatically
+          // rather than sitting in "Listening…" waiting for nothing.
+          if (shouldEndCallRef.current) {
+            shouldEndCallRef.current = false;
+            endCall();
+            return;
+          }
           if (callStateRef.current !== VOICE_CALL_STATE.ERROR) setCallState(VOICE_CALL_STATE.LISTENING);
+          // Barge-in was off and the customer talked while we were still
+          // speaking — now that we're done, process what they said.
+          if (finalizedTranscriptRef.current.trim()) sendFinalTranscript();
         },
         onError: () => setError("Voice playback dropped, but text responses are still available."),
       });
       await waitForSocketOpen(ttsRef.current.socket, "Text-to-speech");
+
+      // Flush any speech (e.g. the call-start greeting) that arrived
+      // before this socket was ready to accept it.
+      if (pendingSpeechRef.current.length) {
+        const queued = pendingSpeechRef.current;
+        pendingSpeechRef.current = [];
+        for (const text of queued) speakSentence(text);
+      }
 
       setCallState(VOICE_CALL_STATE.LISTENING);
     } catch (err) {
@@ -297,10 +367,8 @@ export function useVoiceSession({ sessionId, customerEmail, chat, onSessionCreat
       }
     }
     await cleanup();
-    // Deliberately keep `sessionId` alive (owned by the parent) so the same
-    // voice conversation can be resumed later in this page session.
     setCallState(VOICE_CALL_STATE.IDLE);
   }, [cleanup, setCallState]);
 
-  return { callState, error, startCall, endCall };
+  return { callState, error, startCall, endCall, micMuted, speakerMuted, toggleMic, toggleSpeaker };
 }

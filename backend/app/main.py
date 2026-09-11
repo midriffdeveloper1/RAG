@@ -45,6 +45,18 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     init_db()
+    import threading
+
+    def _warm_up_embeddings():
+        try:
+            from app.services.embedding_service import get_embedding_service
+
+            get_embedding_service()
+            logging.getLogger(__name__).info("Embedding model warmed up.")
+        except Exception:
+            logging.getLogger(__name__).exception("Embedding model warm-up failed (will lazy-load on first use).")
+
+    threading.Thread(target=_warm_up_embeddings, daemon=True).start()
 
 
 # Routers

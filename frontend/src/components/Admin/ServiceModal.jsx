@@ -8,6 +8,7 @@ function toFormState(service) {
   return {
     name: service?.name || "",
     description: service?.description || "",
+    category: service?.category || "",
     price: service?.price ?? "",
     duration_minutes: service?.duration_minutes ?? "",
   };
@@ -29,6 +30,7 @@ export default function ServiceModal({ service, onClose, onSaved }) {
       const payload = {
         name: form.name.trim(),
         description: form.description.trim() || null,
+        category: form.category.trim() || null,
         price: form.price === "" ? null : Number(form.price),
         duration_minutes: form.duration_minutes === "" ? null : Number(form.duration_minutes),
       };
@@ -61,6 +63,15 @@ export default function ServiceModal({ service, onClose, onSaved }) {
             rows={2}
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
+          />
+        </label>
+
+        <label className="settings-form__field">
+          Category
+          <input
+            value={form.category}
+            onChange={(e) => setForm({ ...form, category: e.target.value })}
+            placeholder="e.g. Hair, Skin, Nails, Bridal"
           />
         </label>
 

@@ -9,7 +9,7 @@ from app.core.database import get_db
 from app.realtime.deepgram_provider import DeepgramConfigError, get_voice_provider
 from app.realtime.events import RealtimeEvent, RealtimeEventType
 from app.realtime.session import VoiceSessionService
-from app.realtime.tool_bridge import stream_turn
+from app.realtime.tool_bridge import greeting_turn, stream_turn
 from app.schemas.voice import DeepgramStreamConfig, VoiceSessionRequest, VoiceSessionResponse
 from app.services.chatbot_config_service import ChatbotConfigService
 
@@ -77,6 +77,11 @@ async def voice_events_ws(
         ).to_wire()
     )
     await websocket.send_json(RealtimeEvent(type=RealtimeEventType.CALL_STARTED).to_wire())
+
+    # Greet first — the customer shouldn't have to speak first to get a
+    # response; this fires once, right as the call connects.
+    for event in greeting_turn(db, session, channel="voice"):
+        await websocket.send_json(event.to_wire())
 
     try:
         while True:
