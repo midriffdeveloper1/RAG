@@ -334,6 +334,10 @@ body {
   font-size: 14px;
 }
 
+.chat-widget--loading {
+  min-height: 320px;
+}
+
 @media (max-width: 720px) {
   .app-shell:has(.home-page--with-sidebar) {
     height: auto;
@@ -705,11 +709,100 @@ body {
 }
 
 .voice-modal-card {
-  max-width: 420px;
-  max-height: 85vh;
+  width: min(94vw, 560px);
+  height: min(88vh, 720px);
+  max-height: 88vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+@media (max-width: 560px) {
+  .voice-modal-card {
+    width: 96vw;
+    height: 92vh;
+    max-height: 92vh;
+  }
+}
+
+/* --- Chat/Voice landing picker --- */
+.mode-choice {
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 48px 32px;
+  text-align: center;
+}
+
+.mode-choice__intro h2 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--color-primary-dark);
+  margin: 0 0 8px;
+}
+
+.mode-choice__intro p {
+  font-size: 14.5px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.mode-choice__options {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+  max-width: 520px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.mode-choice__card {
+  flex: 1 1 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 32px 20px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mode-choice__card:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(42, 38, 34, 0.08);
+}
+
+.mode-choice__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.mode-choice__title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  color: var(--color-text);
+}
+
+.mode-choice__desc {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+@media (max-width: 560px) {
+  .mode-choice {
+    padding: 32px 20px;
+  }
 }
 
 .voice-modal__header {

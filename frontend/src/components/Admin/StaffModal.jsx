@@ -10,6 +10,7 @@ function toFormState(staff) {
     name: staff?.name || "",
     email: staff?.email || "",
     phone: staff?.phone || "",
+    specialty: staff?.specialty || "",
     is_active: staff?.is_active ?? true,
     service_ids: staff?.services?.map((s) => s.id) || [],
   };
@@ -65,6 +66,17 @@ export default function StaffModal({ staff, services, onClose, onSaved }) {
           Phone
           <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
         </label>
+        <p className="settings-form__hint">Email and phone are for your records only — the assistant never shares them with customers.</p>
+
+        <label className="settings-form__field">
+          Specialty
+          <input
+            value={form.specialty}
+            onChange={(e) => setForm({ ...form, specialty: e.target.value })}
+            placeholder="e.g. Bridal makeup & hair styling"
+          />
+        </label>
+        <p className="settings-form__hint">Shown to customers alongside their name — e.g. "Neha Sharma — Bridal makeup & hair styling".</p>
 
         <label className="settings-form__field">
           Services
