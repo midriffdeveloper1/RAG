@@ -708,21 +708,44 @@ body {
   z-index: 200;
 }
 
-.voice-modal-card {
-  width: min(94vw, 560px);
-  height: min(88vh, 720px);
-  max-height: 88vh;
+.wide-modal-card {
+  width: 70vw;
+  min-width: 340px;
+  max-width: 880px;
+  height: min(85vh, 760px);
+  max-height: 85vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
-@media (max-width: 560px) {
-  .voice-modal-card {
-    width: 96vw;
-    height: 92vh;
-    max-height: 92vh;
+@media (max-width: 720px) {
+  .wide-modal-card {
+    width: 94vw;
+    height: 90vh;
+    max-height: 90vh;
   }
+}
+
+.voice-modal-card {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Chat modal --- */
+.chat-modal-card .chat-window {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+.chat-modal-card .suggested-questions {
+  flex-shrink: 0;
+}
+
+.chat-modal-card .chat-input {
+  flex-shrink: 0;
 }
 
 /* --- Chat/Voice landing picker --- */

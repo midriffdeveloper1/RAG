@@ -11,6 +11,7 @@ class ExtractedOpeningHour(BaseModel):
 class ExtractedService(BaseModel):
     name: str
     description: str | None = None
+    category: str | None = None
     price: float | None = None
     duration_minutes: int | None = None
 
@@ -19,6 +20,7 @@ class ExtractedStaff(BaseModel):
     name: str
     email: str | None = None
     phone: str | None = None
+    specialty: str | None = None
     service_names: list[str] = Field(default_factory=list)
 
 

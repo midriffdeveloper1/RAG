@@ -51,7 +51,7 @@ export default function VoiceCallModal({
 
   return (
     <div className="modal-overlay voice-modal-overlay" role="dialog" aria-modal="true" aria-label="Voice call">
-      <div className="modal-card voice-modal-card">
+      <div className="modal-card wide-modal-card voice-modal-card">
         <div className="modal-card__header voice-modal__header">
           <h2>Voice Call</h2>
           <span className="voice-modal__status" role="status" aria-live="polite">

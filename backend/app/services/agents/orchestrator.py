@@ -194,7 +194,7 @@ class OrchestratorService:
             else f"Latest message: {question}"
         )
         try:
-            data = self.llm.generate_json(_TURN_CLASSIFIER_SYSTEM_PROMPT, user_prompt, max_tokens=200, temperature=0, fast=True)
+            data = self.llm.generate_json(_TURN_CLASSIFIER_SYSTEM_PROMPT, user_prompt, max_tokens=200, temperature=0, fast=False)
             escalate = bool(data.get("escalate"))
             intent = data.get("intent")
             if intent not in ("booking", "knowledge"):

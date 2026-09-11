@@ -1,4 +1,3 @@
-import json
 import logging
 
 from sqlalchemy.orm import Session
@@ -14,7 +13,7 @@ from app.services.llm_service import get_llm_service
 logger = logging.getLogger(__name__)
 
 MAX_EXTRACTION_CHARS = 30_000
-EXTRACTION_MAX_TOKENS = 6000
+EXTRACTION_MAX_TOKENS = 10000
 
 EXTRACTION_SYSTEM_PROMPT = """You extract structured business facts from a document so they can be \
 saved into a database. Read the document text and return ONLY a single valid JSON object — no \
@@ -32,10 +31,10 @@ markdown fences, no commentary, no trailing text — matching exactly this shape
     {"day_of_week": "Monday", "open_time": "10:00", "close_time": "19:00", "is_closed": false}
   ],
   "services": [
-    {"name": string, "description": string or null, "price": number or null, "duration_minutes": integer or null}
+    {"name": string, "description": string or null, "category": string or null, "price": number or null, "duration_minutes": integer or null}
   ],
   "staff": [
-    {"name": string, "email": string or null, "phone": string or null, "service_names": [string, ...]}
+    {"name": string, "email": string or null, "phone": string or null, "specialty": string or null, "service_names": [string, ...]}
   ],
   "faqs": [
     {"question": string, "answer": string, "category": string or null}
@@ -53,9 +52,13 @@ Rules:
 - day_of_week must be a full weekday name (Monday..Sunday). Only include days actually mentioned.
   Times should be 24-hour "HH:MM" strings when a specific time is stated.
 - Only list a "service" if it's something customers can book/purchase (with or without a stated
-  price/duration) — not general amenities.
+  price/duration) — not general amenities. "category" is the broader grouping it's sold under if
+  the document organizes services that way (e.g. "Hair", "Skin", "Nails", "Bridal") - use null if
+  the document doesn't group services into named sections/categories.
 - Only list "staff" if named individuals are mentioned as people who provide the services (not
-  generic phrases like "our team").
+  generic phrases like "our team"). "specialty" is a short phrase describing what they're known
+  for/focus on (e.g. "Bridal makeup & hair styling", "Colour specialist") if the document says so -
+  use null if nothing like that is mentioned. Never put a phone number or email in "specialty".
 - List a "faq" for any explicit question-and-answer pair in the document, or any standalone
   statement that answers a question a customer would plausibly ask (e.g. "Do you accept walk-ins?
   Yes, ..."). Keep the question phrased naturally, as a customer would ask it.
@@ -80,35 +83,24 @@ class DocumentExtractionService:
 
         truncated = document_text[:MAX_EXTRACTION_CHARS]
         try:
-            raw = llm.generate(
+            
+            data = llm.generate_json(
                 EXTRACTION_SYSTEM_PROMPT,
                 f"Document text:\n\n{truncated}",
                 max_tokens=EXTRACTION_MAX_TOKENS,
                 temperature=0.0,
             )
+        except ValueError:
+            logger.warning("Document extraction LLM call returned no usable JSON", exc_info=True)
+            return None
         except Exception:
             logger.exception("LLM call failed during document field extraction")
             return None
 
-        return self._parse(raw)
-
-    @staticmethod
-    def _parse(raw: str) -> DocumentExtractionResult | None:
-        if not raw:
-            return None
-        text = raw.strip()
-        # Defensive: strip a ```json ... ``` fence if the model added one anyway.
-        if text.startswith("```"):
-            text = text.strip("`")
-            if text.lower().startswith("json"):
-                text = text[4:]
-            text = text.strip()
-
         try:
-            data = json.loads(text)
             return DocumentExtractionResult.model_validate(data)
         except Exception:
-            logger.warning("Couldn't parse document extraction output as valid JSON")
+            logger.warning("Document extraction JSON didn't match the expected shape: %r", data)
             return None
 
     # --- Applying to the database -------------------------------------------
@@ -162,6 +154,8 @@ class DocumentExtractionService:
 
             if item.description:
                 service.description = item.description
+            if item.category:
+                service.category = item.category
             if item.price is not None:
                 service.price = item.price
             if item.duration_minutes is not None:
@@ -191,6 +185,8 @@ class DocumentExtractionService:
                 member.email = item.email
             if item.phone:
                 member.phone = item.phone
+            if item.specialty:
+                member.specialty = item.specialty
 
             for service_name in item.service_names:
                 service = services_by_name.get(service_name.strip().lower())
