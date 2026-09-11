@@ -194,7 +194,7 @@ class OrchestratorService:
             else f"Latest message: {question}"
         )
         try:
-            data = self.llm.generate_json(_TURN_CLASSIFIER_SYSTEM_PROMPT, user_prompt, max_tokens=60, temperature=0, fast=True)
+            data = self.llm.generate_json(_TURN_CLASSIFIER_SYSTEM_PROMPT, user_prompt, max_tokens=200, temperature=0, fast=True)
             escalate = bool(data.get("escalate"))
             intent = data.get("intent")
             if intent not in ("booking", "knowledge"):
@@ -210,7 +210,7 @@ class OrchestratorService:
             return name, phone
 
         try:
-            data = self.llm.generate_json(_CONTACT_EXTRACTION_SYSTEM_PROMPT, message, max_tokens=100, temperature=0, fast=True)
+            data = self.llm.generate_json(_CONTACT_EXTRACTION_SYSTEM_PROMPT, message, max_tokens=200, temperature=0, fast=True)
 
             def _clean(value):
                 if not isinstance(value, str):
