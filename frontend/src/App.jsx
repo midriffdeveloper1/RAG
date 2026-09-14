@@ -6,6 +6,8 @@ import Header from "./components/layout/Header.jsx";
 import AdminLogin from "./pages/AdminLogin.jsx";
 import AdminAppointmentsPage from "./pages/admin/AdminAppointmentsPage.jsx";
 import AdminBusinessPage from "./pages/admin/AdminBusinessPage.jsx";
+import BusinessDocumentUploadPage from "./pages/admin/BusinessManagement/BusinessDocumentUploadPage.jsx";
+import BusinessDocumentTypePage from "./pages/admin/BusinessManagement/BusinessDocumentTypePage.jsx";
 import AdminChatbotConfigPage from "./pages/admin/AdminChatbotConfigPage.jsx";
 import AdminConversationsPage from "./pages/admin/AdminConversationsPage.jsx";
 import AdminCustomersPage from "./pages/admin/AdminCustomersPage.jsx";
@@ -44,6 +46,8 @@ export default function App() {
             <Route path="customers" element={<AdminCustomersPage />} />
             <Route path="knowledge-base" element={<AdminKnowledgeBasePage />} />
             <Route path="business" element={<AdminBusinessPage />} />
+            <Route path="business-management/upload" element={<BusinessDocumentUploadPage />} />
+            <Route path="business-management/:docPath" element={<BusinessDocumentTypePage />} />
             <Route path="chatbot-config" element={<AdminChatbotConfigPage />} />
           </Route>
         </Routes>
