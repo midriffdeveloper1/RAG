@@ -1,5 +1,6 @@
 from app.models.admin import Admin
 from app.models.appointment import Appointment, AppointmentStatus
+from app.models.business_document import BusinessDocument, BusinessDocumentStatus, BusinessDocumentType
 from app.models.chat_session import ChatMessage, ChatSession
 from app.models.chatbot_config import ChatbotConfig
 from app.models.customer import Customer

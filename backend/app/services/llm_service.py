@@ -227,6 +227,59 @@ class LLMService:
 
         return data
 
+    def generate_json_with_image(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        image_base64: str,
+        image_mime_type: str = "image/jpeg",
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> dict[str, Any]:
+
+        response = self.client.chat.completions.create(
+            model=settings.openrouter_vision_model,
+            temperature=0.0 if temperature is None else temperature,
+            max_tokens=(
+                settings.openrouter_max_tokens if max_tokens is None else max_tokens
+            ),
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{image_mime_type};base64,{image_base64}"
+                            },
+                        },
+                    ],
+                },
+            ],
+            response_format={"type": "json_object"},
+        )
+
+        choice = response.choices[0]
+        content = choice.message.content or ""
+
+        if not content:
+            raise ValueError("LLM returned an empty response")
+        if choice.finish_reason == "length":
+            raise ValueError("LLM JSON response was truncated")
+
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError as exc:
+            logger.error("Invalid JSON returned by vision LLM: %r", content)
+            raise ValueError("LLM returned invalid JSON") from exc
+
+        if not isinstance(data, dict):
+            raise ValueError("LLM JSON response must be a JSON object")
+
+        return data
+
     def generate_stream(
         self,
         system_prompt: str,

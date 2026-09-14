@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = 20
     allowed_upload_extensions: str = ".pdf,.docx,.doc"
 
+    business_document_upload_dir: str = "app/uploads/business_documents"
+    business_document_max_upload_size_mb: int = 20
+    business_document_allowed_extensions: str = ".pdf,.jpg,.jpeg,.png,.webp,.docx,.doc"
+    business_document_max_files_per_batch: int = 15
+
     
     chunk_size: int = 500  # characters
     chunk_overlap: int = 150 
@@ -46,10 +51,6 @@ class Settings(BaseSettings):
     keyword_boost_weight: float = 0.3
     relevance_score_threshold: float = 0.1
 
-    # Booking flows often run 15-20+ turns (service, date, time-of-day,
-    # slot, corrections, name, phone, confirm). Too small a window here
-    # means the agent can literally lose the service/date it confirmed
-    # earlier in the SAME booking and have to re-ask from scratch.
     max_history_exchanges: int = 16
 
     cancellation_window_hours: int = 24
@@ -71,12 +72,15 @@ class Settings(BaseSettings):
     voice_max_call_seconds: int = 900
     
     openrouter_api_key: str | None = ""
-    openrouter_model: str = "openai/gpt-oss-120b"  
+    openrouter_model: str = "gpt-4.1"  
     openrouter_fast_model: str = ""
     openrouter_temperature: float = 0.3
     openrouter_max_tokens: int = 500
     openrouter_site_url: str = ""
     openrouter_site_name: str = ""
+
+    
+    openrouter_vision_model: str = "gpt-5.4-mini"
 
     business_name: str = " "
     business_description: str = ""
@@ -95,6 +99,14 @@ class Settings(BaseSettings):
     @property
     def allowed_upload_extensions_list(self) -> List[str]:
         return [ext.strip().lower() for ext in self.allowed_upload_extensions.split(",") if ext.strip()]
+
+    @property
+    def business_document_allowed_extensions_list(self) -> List[str]:
+        return [
+            ext.strip().lower()
+            for ext in self.business_document_allowed_extensions.split(",")
+            if ext.strip()
+        ]
 
     @property
     def sqlalchemy_database_url(self) -> str:

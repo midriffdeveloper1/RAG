@@ -8,6 +8,7 @@ from app.api.routes import (
     appointments,
     auth,
     business,
+    business_documents,
     chat,
     chat_sessions,
     chatbot_config,
@@ -63,6 +64,7 @@ def on_startup():
 app.include_router(health.router, prefix=settings.api_v1_prefix)
 app.include_router(auth.router, prefix=settings.api_v1_prefix)
 app.include_router(documents.router, prefix=settings.api_v1_prefix)
+app.include_router(business_documents.router, prefix=settings.api_v1_prefix)
 app.include_router(services.router, prefix=settings.api_v1_prefix)
 app.include_router(staff.router, prefix=settings.api_v1_prefix)
 app.include_router(appointments.router, prefix=settings.api_v1_prefix)
