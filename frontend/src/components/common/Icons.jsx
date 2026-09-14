@@ -437,3 +437,98 @@ export function VolumeX(props) {
     </Svg>
   );
 }
+
+export function Receipt(props) {
+  return (
+    <Svg {...props}>
+      <path d="M5 3h14v18l-2.5-1.5L14 21l-2.5-1.5L9 21l-2.5-1.5L4 21V3z" />
+      <line x1="8" y1="7.5" x2="16" y2="7.5" />
+      <line x1="8" y1="11" x2="16" y2="11" />
+      <line x1="8" y1="14.5" x2="13" y2="14.5" />
+    </Svg>
+  );
+}
+
+export function ClipboardList(props) {
+  return (
+    <Svg {...props}>
+      <rect x="5.5" y="4" width="13" height="17" rx="1.5" />
+      <path d="M9 4V3a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 3v1" />
+      <line x1="8.5" y1="10" x2="15.5" y2="10" />
+      <line x1="8.5" y1="13.5" x2="15.5" y2="13.5" />
+      <line x1="8.5" y1="17" x2="12.5" y2="17" />
+    </Svg>
+  );
+}
+
+export function FileSpreadsheet(props) {
+  return (
+    <Svg {...props}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="8" y1="13" x2="16" y2="13" />
+      <line x1="8" y1="17" x2="16" y2="17" />
+      <line x1="11.5" y1="13" x2="11.5" y2="21" />
+    </Svg>
+  );
+}
+
+export function FileSignature(props) {
+  return (
+    <Svg {...props}>
+      <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h9" />
+      <polyline points="13 2 13 8 19 8" />
+      <path d="M14.5 15.5c1-1.2 2-1.8 2.6-1.2.6.6-.2 1.6-.9 2.3-.7.7.3 1 1 .6.8-.4 1.6-1.3 1.8-1.7" />
+      <line x1="8" y1="18.5" x2="12" y2="18.5" />
+    </Svg>
+  );
+}
+
+export function FolderKanban(props) {
+  return (
+    <Svg {...props}>
+      <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5A1.5 1.5 0 0 1 19.5 20h-15A1.5 1.5 0 0 1 3 18.5z" />
+      <line x1="9" y1="11.5" x2="9" y2="16.5" />
+      <line x1="12.5" y1="11.5" x2="12.5" y2="14.5" />
+      <line x1="16" y1="11.5" x2="16" y2="17" />
+    </Svg>
+  );
+}
+
+export function Eye(props) {
+  return (
+    <Svg {...props}>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </Svg>
+  );
+}
+
+export function Save(props) {
+  return (
+    <Svg {...props}>
+      <path d="M5 3h11l3 3v15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+      <path d="M8 3v5h7V3" />
+      <path d="M7 21v-7h10v7" />
+    </Svg>
+  );
+}
+
+export function Image(props) {
+  return (
+    <Svg {...props}>
+      <rect x="3" y="3.5" width="18" height="17" rx="2" />
+      <circle cx="8.5" cy="9" r="1.6" fill="currentColor" stroke="none" />
+      <path d="M21 16l-5.5-5.5a1.5 1.5 0 0 0-2.1 0L4 19" />
+    </Svg>
+  );
+}
+
+export function ShieldCheck(props) {
+  return (
+    <Svg {...props}>
+      <path d="M12 2.5l7.5 3v6c0 5-3.2 8.4-7.5 10-4.3-1.6-7.5-5-7.5-10v-6z" />
+      <polyline points="8.7 12 11 14.3 15.3 9.8" />
+    </Svg>
+  );
+}

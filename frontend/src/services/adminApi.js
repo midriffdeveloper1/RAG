@@ -257,3 +257,59 @@ export async function updateCustomer(customerId, payload) {
 export async function deleteCustomer(customerId) {
   await apiClient.delete(`/admin/customers/${customerId}`);
 }
+
+export async function uploadBusinessDocuments(files, documentType, onUploadProgress) {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append("files", file);
+  }
+
+  const { data } = await apiClient.post("/admin/business-documents/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    params: documentType ? { document_type: documentType } : undefined,
+    onUploadProgress,
+  });
+  return data;
+}
+
+export async function listBusinessDocuments({ page = 1, pageSize = 10, documentType, status } = {}) {
+  const { data } = await apiClient.get("/admin/business-documents", {
+    params: {
+      page,
+      page_size: pageSize,
+      document_type: documentType || undefined,
+      status: status || undefined,
+    },
+  });
+  return {
+    items: data.documents,
+    total: data.total,
+    page: data.page,
+    page_size: data.page_size,
+    total_pages: data.total_pages,
+  };
+}
+
+export async function getBusinessDocument(documentId) {
+  const { data } = await apiClient.get(`/admin/business-documents/${documentId}`);
+  return data;
+}
+
+export async function updateBusinessDocument(documentId, fields) {
+  const { data } = await apiClient.patch(`/admin/business-documents/${documentId}`, { fields });
+  return data;
+}
+
+export async function reprocessBusinessDocument(documentId) {
+  const { data } = await apiClient.post(`/admin/business-documents/${documentId}/reprocess`);
+  return data;
+}
+
+export async function deleteBusinessDocument(documentId) {
+  await apiClient.delete(`/admin/business-documents/${documentId}`);
+}
+
+export async function getBusinessDocumentsSummary() {
+  const { data } = await apiClient.get("/admin/business-documents/summary");
+  return data;
+}
