@@ -72,14 +72,19 @@ class Settings(BaseSettings):
     voice_max_call_seconds: int = 900
     
     openrouter_api_key: str | None = ""
-    openrouter_model: str = "gpt-4.1"  
+    openrouter_model: str = "gpt-4.1"   
     openrouter_fast_model: str = ""
     openrouter_temperature: float = 0.3
     openrouter_max_tokens: int = 500
     openrouter_site_url: str = ""
     openrouter_site_name: str = ""
-
     
+    openai_api_key: str | None = ""
+    openai_model: str = "gpt-5.4-mini"
+    openai_fast_model: str = ""
+    openai_temperature: float = 0.3
+    openai_max_tokens: int = 500
+    openai_vision_model: str = "gpt-5.4-mini"
     openrouter_vision_model: str = "gpt-5.4-mini"
 
     business_name: str = " "
