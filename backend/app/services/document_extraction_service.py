@@ -83,12 +83,13 @@ class DocumentExtractionService:
 
         truncated = document_text[:MAX_EXTRACTION_CHARS]
         try:
-            
+
             data = llm.generate_json(
                 EXTRACTION_SYSTEM_PROMPT,
                 f"Document text:\n\n{truncated}",
                 max_tokens=EXTRACTION_MAX_TOKENS,
                 temperature=0.0,
+                timeout=120.0,
             )
         except ValueError:
             logger.warning("Document extraction LLM call returned no usable JSON", exc_info=True)
@@ -114,7 +115,7 @@ class DocumentExtractionService:
 
         for field in ("name", "description", "address", "phone", "email"):
             value = getattr(extracted, field)
-            if value:  
+            if value:
                 setattr(business, field, value)
                 summary.business_fields_updated.append(field)
 
@@ -141,7 +142,7 @@ class DocumentExtractionService:
         }
         for item in extracted_services:
             if not item.name or not item.name.strip():
-                continue  
+                continue
             key = item.name.strip().lower()
             service = services_by_name.get(key)
             if service is None:
@@ -170,7 +171,7 @@ class DocumentExtractionService:
         existing_staff = {s.name.strip().lower(): s for s in self.db.query(Staff).all()}
         for item in extracted_staff:
             if not item.name or not item.name.strip():
-                continue  
+                continue
             key = item.name.strip().lower()
             member = existing_staff.get(key)
             if member is None:
@@ -242,7 +243,7 @@ class DocumentExtractionService:
             policy.content = item.content
 
     def extract_and_apply(self, document_text: str) -> ExtractionSummary:
-       
+
         summary = ExtractionSummary()
 
         result = self._call_llm(document_text)

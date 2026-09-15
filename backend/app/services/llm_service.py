@@ -337,8 +337,6 @@
 # @lru_cache
 # def get_llm_service() -> LLMService:
 #     return LLMService()
-
-
 import json
 import logging
 from functools import lru_cache
@@ -361,8 +359,8 @@ class LLMService:
 
         self.client = OpenAI(
             api_key=settings.openai_api_key,
-            max_retries=0,
-            timeout=20.0,
+            max_retries=2,
+            timeout=120.0,
         )
 
         self.model = settings.openai_model
@@ -405,8 +403,10 @@ class LLMService:
         max_tokens: int | None = None,
         temperature: float | None = None,
         fast: bool = False,
+        timeout: float | None = None,
     ) -> dict[str, Any]:
-        response = self.client.chat.completions.create(
+        client = self.client if timeout is None else self.client.with_options(timeout=timeout)
+        response = client.chat.completions.create(
             model=self.fast_model if fast else self.model,
             temperature=(
                 settings.openai_temperature
