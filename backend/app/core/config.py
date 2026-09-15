@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     voice_max_call_seconds: int = 900
     
     openrouter_api_key: str | None = ""
-    openrouter_model: str = "gpt-4.1"   
+    openrouter_model: str = "openai/gpt-oss-120b"  
     openrouter_fast_model: str = ""
     openrouter_temperature: float = 0.3
     openrouter_max_tokens: int = 500
@@ -85,7 +85,26 @@ class Settings(BaseSettings):
     openai_temperature: float = 0.3
     openai_max_tokens: int = 500
     openai_vision_model: str = "gpt-5.4-mini"
-    openrouter_vision_model: str = "gpt-5.4-mini"
+
+    business_name: str = " "
+    business_description: str = ""
+
+    redis_url: str = "redis://localhost:6379/0"
+    celery_broker_url: str | None = None 
+    celery_result_backend: str | None = None  
+    celery_task_always_eager: bool = False
+
+    mail_enabled: bool = False  
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True
+    mail_from_address: str = ""
+    mail_from_name: str = "Booking Desk"
+
+    low_confidence_notification_threshold: float = 0.75
+    frontend_base_url: str = "http://localhost:5173"
 
     business_name: str = " "
     business_description: str = ""
@@ -112,6 +131,15 @@ class Settings(BaseSettings):
             for ext in self.business_document_allowed_extensions.split(",")
             if ext.strip()
         ]
+        
+    @property
+    def celery_broker_url_resolved(self) -> str:
+        return self.celery_broker_url or self.redis_url
+
+
+    @property
+    def celery_result_backend_resolved(self) -> str:
+        return self.celery_result_backend or self.redis_url
 
     @property
     def sqlalchemy_database_url(self) -> str:

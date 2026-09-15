@@ -532,3 +532,22 @@ export function ShieldCheck(props) {
     </Svg>
   );
 }
+
+export function Bell(props) {
+  return (
+    <Svg {...props}>
+      <path d="M6 9a6 6 0 0 1 12 0c0 4 1.5 6 2 7H4c0.5-1 2-3 2-7z" />
+      <path d="M10 20a2 2 0 0 0 4 0" />
+    </Svg>
+  );
+}
+
+export function Info(props) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="9.5" />
+      <line x1="12" y1="11" x2="12" y2="16.5" />
+      <circle cx="12" cy="7.7" r="0.9" fill="currentColor" stroke="none" />
+    </Svg>
+  );
+}

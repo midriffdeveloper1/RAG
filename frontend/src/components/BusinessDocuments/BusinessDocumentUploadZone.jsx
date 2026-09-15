@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { uploadBusinessDocuments } from "../../services/adminApi.js";
+import { useEffect, useRef, useState } from "react";
+import { getBusinessDocument, uploadBusinessDocuments } from "../../services/adminApi.js";
 import { getDocumentTypeConfig } from "../../config/businessDocumentTypes.js";
 import { AlertCircle, CheckCircle2, FileText, UploadCloud, XCircle } from "../common/Icons.jsx";
 import { Spinner } from "../common/Spinner.jsx";
@@ -9,6 +9,8 @@ import { formatFileSize, getHeadline } from "../../utils/businessDocuments.js";
 
 const ACCEPTED_EXTENSIONS = ".pdf,.jpg,.jpeg,.png,.webp,.docx,.doc";
 const MAX_FILES = 15;
+const POLL_INTERVAL_MS = 3000;
+const ACTIVE_STATUSES = new Set(["pending", "processing"]);
 
 export default function BusinessDocumentUploadZone({ documentTypeHint, onUploaded }) {
   const fileInputRef = useRef(null);
@@ -16,6 +18,25 @@ export default function BusinessDocumentUploadZone({ documentTypeHint, onUploade
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState(null);
   const [results, setResults] = useState([]); // BusinessDocumentOut[] from the last batch
+
+  // Uploads are processed in the background (Celery), so the batch first
+  // comes back as pending/processing rows — poll each until it settles.
+  useEffect(() => {
+    const activeIds = results.filter((d) => ACTIVE_STATUSES.has(d.status)).map((d) => d.id);
+    if (activeIds.length === 0) return undefined;
+
+    const interval = setInterval(async () => {
+      const updates = await Promise.all(
+        activeIds.map((id) => getBusinessDocument(id).catch(() => null))
+      );
+      setResults((prev) =>
+        prev.map((doc) => updates.find((u) => u && u.id === doc.id) || doc)
+      );
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results]);
 
   async function handleFiles(fileList) {
     const files = Array.from(fileList || []);
@@ -113,6 +134,8 @@ export default function BusinessDocumentUploadZone({ documentTypeHint, onUploade
                   <div className="upload-batch-results__icon">
                     {doc.status === "failed" ? (
                       <XCircle size={18} className="upload-batch-results__icon--failed" />
+                    ) : ACTIVE_STATUSES.has(doc.status) ? (
+                      <Spinner size={16} />
                     ) : doc.is_valid ? (
                       <CheckCircle2 size={18} className="upload-batch-results__icon--ok" />
                     ) : (

@@ -10,15 +10,14 @@ from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models.business_document import (
-    BusinessDocument,
+from app.models.business_documents.upload import (
     BusinessDocumentStatus,
     BusinessDocumentType,
+    BusinessDocumentUpload,
 )
-from app.services.business_documents import extraction
+from app.services.business_documents import extraction, persistence
 from app.services.business_documents.scoring import compute_confidence
 from app.services.business_documents.validation import validate_fields
-from app.services.document_processor import extract_text, infer_file_type
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -45,10 +44,21 @@ class BusinessDocumentService:
         self.upload_dir = Path(settings.business_document_upload_dir)
         self.upload_dir.mkdir(parents=True, exist_ok=True)
 
-    # ---- Upload -------------------------------------------------------
+    @staticmethod
+    def _infer_file_type(filename: str) -> str:
+        from app.services.document_processor import infer_file_type
 
+        return infer_file_type(filename)
+
+    @staticmethod
+    def _extract_text(file_path: str, file_type: str) -> str:
+        from app.services.document_processor import extract_text
+
+        return extract_text(file_path, file_type)
+
+    
     def save_upload(self, file: UploadFile) -> tuple[Path, str, int, str]:
-        file_type = infer_file_type(file.filename)
+        file_type = self._infer_file_type(file.filename)
         if f".{file_type}" not in settings.business_document_allowed_extensions_list:
             raise ValueError(
                 f"'.{file_type}' files aren't supported here. "
@@ -86,8 +96,8 @@ class BusinessDocumentService:
         size_bytes: int,
         file_type: str,
         requested_document_type: str | None = None,
-    ) -> BusinessDocument:
-        document = BusinessDocument(
+    ) -> BusinessDocumentUpload:
+        document = BusinessDocumentUpload(
             original_filename=file.filename,
             stored_filename=dest_path.name,
             file_path=str(dest_path),
@@ -102,9 +112,9 @@ class BusinessDocumentService:
         self.db.refresh(document)
         return document
 
-    # ---- Processing -----------------------------------------------------
+    # ---- Processing (runs inside a Celery worker) ----------------------
 
-    def process_document(self, document: BusinessDocument) -> BusinessDocument:
+    def process_document(self, document: BusinessDocumentUpload) -> BusinessDocumentUpload:
         document.status = BusinessDocumentStatus.PROCESSING
         self.db.commit()
 
@@ -127,7 +137,6 @@ class BusinessDocumentService:
                     "(invoice, receipt, purchase order, resume, expense report, "
                     "application form, or contract)."
                 )
-                document.extracted_data = {}
                 document.field_confidence = {}
                 document.is_valid = False
                 document.validation_errors = []
@@ -141,7 +150,6 @@ class BusinessDocumentService:
 
                 document.document_type = result.document_type
                 document.type_confidence = result.type_confidence
-                document.extracted_data = result.fields
                 document.field_confidence = result.field_confidence
                 document.confidence_score = confidence
                 document.is_valid = is_valid
@@ -151,6 +159,8 @@ class BusinessDocumentService:
                     BusinessDocumentStatus.COMPLETED if is_valid else BusinessDocumentStatus.NEEDS_REVIEW
                 )
                 document.error_message = None
+
+                persistence.apply_fields(self.db, document, result.document_type, result.fields)
 
             document.processed_at = datetime.utcnow()
 
@@ -164,10 +174,10 @@ class BusinessDocumentService:
         return document
 
     def _run_extraction(
-        self, document: BusinessDocument, expected_type: BusinessDocumentType | None
+        self, document: BusinessDocumentUpload, expected_type: BusinessDocumentType | None
     ) -> extraction.ExtractionResult:
         if document.file_type in TEXT_EXTENSIONS:
-            raw_text = extract_text(document.file_path, document.file_type)
+            raw_text = self._extract_text(document.file_path, document.file_type)
             if not raw_text.strip():
                 raise UnreadableDocumentError(
                     "No extractable text found in this file. If it's a scanned document, "
@@ -182,16 +192,13 @@ class BusinessDocumentService:
 
         raise ValueError(f"Unsupported file type for extraction: {document.file_type}")
 
-    # ---- Corrections / lifecycle ---------------------------------------
+    # ---- Corrections / lifecycle (Admin CRUD) ---------------------------
 
     def apply_manual_correction(
-        self, document: BusinessDocument, field_updates: dict
-    ) -> BusinessDocument:
-        """Admin-edited field values. Treated as ground truth (confidence 1.0)
-        and re-validated, but never re-sent to the LLM."""
-
-        merged_fields = dict(document.extracted_data or {})
-        merged_fields.update(field_updates)
+        self, document: BusinessDocumentUpload, field_updates: dict
+    ) -> BusinessDocumentUpload:
+        persistence.apply_fields(self.db, document, document.document_type, field_updates)
+        merged_fields = persistence.serialize_fields(document)
 
         merged_confidence = dict(document.field_confidence or {})
         for key in field_updates:
@@ -200,7 +207,6 @@ class BusinessDocumentService:
         is_valid, errors, missing = validate_fields(document.document_type, merged_fields)
         confidence = compute_confidence(document.document_type, merged_fields, merged_confidence, missing)
 
-        document.extracted_data = merged_fields
         document.field_confidence = merged_confidence
         document.is_valid = is_valid
         document.validation_errors = errors
@@ -215,21 +221,21 @@ class BusinessDocumentService:
         self.db.refresh(document)
         return document
 
-    def find_completed_duplicate(self, content_hash: str) -> BusinessDocument | None:
+    def find_completed_duplicate(self, content_hash: str) -> BusinessDocumentUpload | None:
         return (
-            self.db.query(BusinessDocument)
+            self.db.query(BusinessDocumentUpload)
             .filter(
-                BusinessDocument.content_hash == content_hash,
-                BusinessDocument.status.in_(
+                BusinessDocumentUpload.content_hash == content_hash,
+                BusinessDocumentUpload.status.in_(
                     [BusinessDocumentStatus.COMPLETED, BusinessDocumentStatus.NEEDS_REVIEW]
                 ),
             )
             .first()
         )
 
-    def delete_document(self, document: BusinessDocument) -> None:
+    def delete_document(self, document: BusinessDocumentUpload) -> None:
         file_path = Path(document.file_path)
         if file_path.exists():
             file_path.unlink()
-        self.db.delete(document)
+        self.db.delete(document)  # cascades to the type-specific row + its children
         self.db.commit()

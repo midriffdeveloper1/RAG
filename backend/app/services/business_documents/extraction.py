@@ -3,14 +3,14 @@ from __future__ import annotations
 import base64
 import logging
 
-from app.models.business_document import BusinessDocumentType
+from app.models.business_documents.upload import BusinessDocumentType
 from app.services.business_documents.field_schemas import FIELD_SCHEMAS, get_schema
 from app.services.llm_service import get_llm_service
 
 logger = logging.getLogger(__name__)
 
 MAX_TEXT_CHARS = 20_000
-EXTRACTION_MAX_TOKENS = 3000
+EXTRACTION_MAX_TOKENS = 8000
 
 VALID_TYPES = [t.value for t in BusinessDocumentType if t != BusinessDocumentType.UNKNOWN]
 

@@ -9,6 +9,7 @@ from app.models.document import Document, DocumentStatus
 from app.schemas.common import PageParams
 from app.schemas.document import DocumentActionResponse, DocumentListResponse, DocumentOut
 from app.services.document_service import DocumentService
+from app.tasks.knowledge_base_tasks import process_kb_document_task, reindex_kb_document_task
 
 router = APIRouter(prefix="/admin/documents", tags=["Admin Documents"])
 
@@ -40,7 +41,7 @@ def upload_document(
         return duplicate
 
     document = service.create_document_record(file, dest_path, content_hash, size_bytes)
-    document = service.process_document(document)
+    process_kb_document_task.delay(document.id)  # chunk + embed in the background
     return document
 
 
@@ -68,10 +69,11 @@ def reindex_document(
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):
-    
     document = _get_document_or_404(document_id, db)
-    service = DocumentService(db)
-    return service.reindex_document(document)
+    document.status = DocumentStatus.PENDING
+    db.commit()
+    reindex_kb_document_task.delay(document.id)  # deletes old vectors, re-chunks, re-embeds
+    return document
 
 
 @router.delete("/{document_id}", response_model=DocumentActionResponse)

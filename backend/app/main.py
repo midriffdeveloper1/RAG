@@ -16,6 +16,7 @@ from app.api.routes import (
     documents,
     health,
     holiday,
+    notifications,
     public_config,
     services,
     staff,
@@ -80,6 +81,7 @@ app.include_router(holiday.router, prefix=settings.api_v1_prefix)
 app.include_router(admin_chat_sessions.router, prefix=settings.api_v1_prefix)
 app.include_router(support_tickets.router, prefix=settings.api_v1_prefix)
 app.include_router(voice.router, prefix=settings.api_v1_prefix)
+app.include_router(notifications.router, prefix=settings.api_v1_prefix)
 
 @app.get("/")
 def root():

@@ -1,4 +1,5 @@
 import difflib
+import logging
 import re
 import secrets
 from datetime import date as date_type
@@ -10,8 +11,15 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.knowledge_base import Business, OpeningHour, Service
+from app.models.notification import NotificationSeverity, NotificationType
 from app.models.staff import Staff
 from app.schemas.appointment import AdminAppointmentCreate, AdminAppointmentUpdate, AppointmentOut
+from app.services.mail_templates import (
+    booking_confirmation_email,
+    cancellation_email,
+    reschedule_email,
+)
+from app.services.notification_service import NotificationService
 from app.services.time_utils import (
     day_name,
     format_display_date,
@@ -22,14 +30,11 @@ from app.services.time_utils import (
 )
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 _REFERENCE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 _REFERENCE_LENGTH = 8
 
-# Time-of-day windows used to filter slot listings (issue: never dump a
-# full day's slots — ask morning/afternoon/evening first, then filter to
-# that window). These are intentionally generous/overlapping-free bands;
-# they're additionally clipped to the business's real opening hours.
 _TIME_OF_DAY_WINDOWS = {
     "morning": (time_type(0, 0), time_type(12, 0)),
     "afternoon": (time_type(12, 0), time_type(17, 0)),
@@ -100,6 +105,86 @@ class AppointmentPolicyError(ValueError):
 class AppointmentService:
     def __init__(self, db: Session) -> None:
         self.db = db
+
+    # ---- Notifications (email + admin bell) -----------------------------
+    # Both are best-effort: a mail/notification hiccup never blocks a
+    # booking/cancel/reschedule that already succeeded in the database.
+    # Emails go through Celery (app.tasks.mail_tasks) so a slow SMTP server
+    # can't stall the request; the import is local to dodge any import-time
+    # cycle between this module and the task/celery-app modules.
+
+    def _dispatch_email(self, to_email: str, subject: str, html: str) -> None:
+        if not to_email:
+            return
+        try:
+            from app.tasks.mail_tasks import send_email_task
+
+            send_email_task.delay(to_email, subject, html)
+        except Exception:
+            logger.exception("Failed to enqueue appointment email to %s", to_email)
+
+    def _notify_admin(
+        self, notif_type: NotificationType, title: str, message: str, related_id: str,
+        severity: NotificationSeverity = NotificationSeverity.INFO,
+    ) -> None:
+        try:
+            NotificationService(self.db).create(
+                type=notif_type,
+                title=title,
+                message=message,
+                link="/admin/appointments",
+                severity=severity,
+                related_id=related_id,
+            )
+        except Exception:
+            logger.exception("Failed to create admin notification for appointment_id=%s", related_id)
+
+    def _on_booked(self, appointment: Appointment, service_name: str, staff_name: str, data: dict) -> None:
+        subject, html = booking_confirmation_email(
+            {**data, "customer_name": appointment.customer_name, "staff": staff_name}
+        )
+        self._dispatch_email(appointment.customer_email, subject, html)
+        self._notify_admin(
+            NotificationType.APPOINTMENT_BOOKED,
+            "New appointment booked",
+            f"{appointment.customer_name} booked {service_name} on {data.get('display_date')} "
+            f"at {data.get('display_time')}.",
+            related_id=appointment.id,
+            severity=NotificationSeverity.SUCCESS,
+        )
+
+    def _on_cancelled(self, appointment: Appointment, service_name: str, display_date: str) -> None:
+        subject, html = cancellation_email(
+            {
+                "appointment_id": appointment.reference_code,
+                "customer_name": appointment.customer_name,
+                "service": service_name,
+                "display_date": display_date,
+                "cancellation_reason": appointment.cancellation_reason,
+            }
+        )
+        self._dispatch_email(appointment.customer_email, subject, html)
+        self._notify_admin(
+            NotificationType.APPOINTMENT_CANCELLED,
+            "Appointment cancelled",
+            f"{appointment.customer_name}'s {service_name} on {display_date} was cancelled.",
+            related_id=appointment.id,
+            severity=NotificationSeverity.WARNING,
+        )
+
+    def _on_rescheduled(self, appointment: Appointment, service_name: str, staff_name: str, data: dict) -> None:
+        subject, html = reschedule_email(
+            {**data, "customer_name": appointment.customer_name, "staff": staff_name}
+        )
+        self._dispatch_email(appointment.customer_email, subject, html)
+        self._notify_admin(
+            NotificationType.APPOINTMENT_RESCHEDULED,
+            "Appointment rescheduled",
+            f"{appointment.customer_name}'s {service_name} was moved to {data.get('display_date')} "
+            f"at {data.get('display_time')}.",
+            related_id=appointment.id,
+            severity=NotificationSeverity.INFO,
+        )
 
     # Lookups
 
@@ -453,6 +538,7 @@ class AppointmentService:
         customer_phone: str,
         staff_name: str | None = None,
         exclude_appointment_id: str | None = None,
+        send_notifications: bool = True,
     ) -> dict:
         if not customer_name or not customer_name.strip():
             return {"error": "Customer name is required to book."}
@@ -548,7 +634,7 @@ class AppointmentService:
         self.db.commit()
         self.db.refresh(appointment)
 
-        return {
+        result = {
             "appointment_id": appointment.reference_code,
             "service": service.name,
             "staff": assigned_staff.name,
@@ -559,6 +645,11 @@ class AppointmentService:
             "display_time": _display_range(start_time.strftime("%H:%M"), end_time.strftime("%H:%M")),
             "status": "booked",
         }
+
+        if send_notifications:
+            self._on_booked(appointment, service.name, assigned_staff.name, result)
+
+        return result
 
     # Ownership + policy
 
@@ -591,9 +682,15 @@ class AppointmentService:
         if policy_error:
             return {"error": policy_error}
 
+        service_name = appointment.service.name
+        display_date = format_display_date(appointment.appointment_date)
+
         appointment.status = AppointmentStatus.CANCELLED
         appointment.cancellation_reason = reason
         self.db.commit()
+
+        self._on_cancelled(appointment, service_name, display_date)
+
         return {"appointment_id": appointment.reference_code, "status": "cancelled"}
 
     def update_contact(
@@ -660,6 +757,7 @@ class AppointmentService:
             customer_phone=appointment.customer_phone,
             staff_name=staff.name,
             exclude_appointment_id=appointment.id,
+            send_notifications=False,  # we send one combined "rescheduled" notice below instead
         )
         if "error" in booking_result:
             return booking_result
@@ -669,6 +767,11 @@ class AppointmentService:
         self.db.commit()
 
         booking_result["rescheduled_from"] = appointment.reference_code
+
+        new_appointment = self.get_by_reference(booking_result["appointment_id"])
+        if new_appointment is not None:
+            self._on_rescheduled(new_appointment, service.name, staff.name, booking_result)
+
         return booking_result
 
     def get_details_for_customer(self, reference_code: str, customer_email: str) -> dict:
@@ -781,6 +884,10 @@ class AppointmentService:
         if appointment is None:
             raise ValueError("Appointment not found.")
 
+        was_status = appointment.status
+        was_date = appointment.appointment_date
+        was_start_time = appointment.start_time
+
         if payload.service_id is not None:
             service = self.db.query(Service).filter(Service.id == payload.service_id).first()
             if service is None:
@@ -818,6 +925,30 @@ class AppointmentService:
 
         self.db.commit()
         self.db.refresh(appointment)
+
+        newly_cancelled = was_status != AppointmentStatus.CANCELLED and appointment.status == AppointmentStatus.CANCELLED
+        time_changed = (
+            not newly_cancelled
+            and appointment.status == AppointmentStatus.BOOKED
+            and (was_date != appointment.appointment_date or was_start_time != appointment.start_time)
+        )
+
+        if newly_cancelled:
+            self._on_cancelled(appointment, appointment.service.name, format_display_date(was_date))
+        elif time_changed:
+            data = {
+                "appointment_id": appointment.reference_code,
+                "service": appointment.service.name,
+                "date": str(appointment.appointment_date),
+                "display_date": format_display_date(appointment.appointment_date),
+                "start_time": appointment.start_time.strftime("%H:%M"),
+                "end_time": appointment.end_time.strftime("%H:%M"),
+                "display_time": _display_range(
+                    appointment.start_time.strftime("%H:%M"), appointment.end_time.strftime("%H:%M")
+                ),
+            }
+            self._on_rescheduled(appointment, appointment.service.name, appointment.staff.name, data)
+
         return appointment
 
     def admin_create(self, payload: AdminAppointmentCreate) -> Appointment:
@@ -871,6 +1002,21 @@ class AppointmentService:
         self.db.add(appointment)
         self.db.commit()
         self.db.refresh(appointment)
+
+        data = {
+            "appointment_id": appointment.reference_code,
+            "service": service.name,
+            "date": str(appointment.appointment_date),
+            "display_date": format_display_date(appointment.appointment_date),
+            "start_time": appointment.start_time.strftime("%H:%M"),
+            "end_time": appointment.end_time.strftime("%H:%M"),
+            "display_time": _display_range(
+                appointment.start_time.strftime("%H:%M"), appointment.end_time.strftime("%H:%M")
+            ),
+            "status": "booked",
+        }
+        self._on_booked(appointment, service.name, staff.name, data)
+
         return appointment
 
     def admin_delete(self, appointment_id: str) -> bool:

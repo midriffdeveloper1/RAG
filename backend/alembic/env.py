@@ -24,6 +24,24 @@ from app.models.chat_session import ChatMessage, ChatSession
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.support_ticket import SupportTicket
+from app.models.notification import Notification
+from app.models.business_documents import (
+    ApplicationForm,
+    BusinessDocumentUpload,
+    Contract,
+    ContractSignatory,
+    ExpenseReport,
+    ExpenseReportItem,
+    Invoice,
+    InvoiceLineItem,
+    PurchaseOrder,
+    PurchaseOrderLineItem,
+    Receipt,
+    ReceiptItem,
+    Resume,
+    ResumeEducation,
+    ResumeExperience,
+)
 
 
 load_dotenv()

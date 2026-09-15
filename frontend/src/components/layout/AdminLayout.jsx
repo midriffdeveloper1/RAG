@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { LogOut, Menu } from "../common/Icons.jsx";
 import AdminSidebar from "./AdminSidebar.jsx";
+import NotificationBell from "./NotificationBell.jsx";
 
 export default function AdminLayout() {
   const { admin, logout } = useAuth();
@@ -33,6 +34,7 @@ export default function AdminLayout() {
 
           <div className="admin-topbar__account">
             <span className="admin-topbar__email">{admin?.email}</span>
+            <NotificationBell />
             <button type="button" className="admin-topbar__logout" onClick={handleLogout}>
               <LogOut size={15} />
               Log out

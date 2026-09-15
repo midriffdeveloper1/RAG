@@ -313,3 +313,40 @@ export async function getBusinessDocumentsSummary() {
   const { data } = await apiClient.get("/admin/business-documents/summary");
   return data;
 }
+
+let _fieldSchemaCache = null;
+
+export async function getBusinessDocumentFieldSchemas() {
+  if (_fieldSchemaCache) return _fieldSchemaCache;
+  const { data } = await apiClient.get("/admin/business-documents/field-schema");
+  _fieldSchemaCache = data;
+  return data;
+}
+
+// --- Admin notifications ----------------------------------------------
+
+export async function listNotifications({ page = 1, pageSize = 20, unreadOnly = false } = {}) {
+  const { data } = await apiClient.get("/admin/notifications", {
+    params: { page, page_size: pageSize, unread_only: unreadOnly },
+  });
+  return data;
+}
+
+export async function getUnreadNotificationCount() {
+  const { data } = await apiClient.get("/admin/notifications/unread-count");
+  return data.unread_count;
+}
+
+export async function markNotificationRead(notificationId) {
+  const { data } = await apiClient.post(`/admin/notifications/${notificationId}/read`);
+  return data;
+}
+
+export async function markAllNotificationsRead() {
+  const { data } = await apiClient.post("/admin/notifications/read-all");
+  return data;
+}
+
+export async function deleteNotification(notificationId) {
+  await apiClient.delete(`/admin/notifications/${notificationId}`);
+}

@@ -3,7 +3,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel
 
-from app.models.business_document import BusinessDocumentStatus, BusinessDocumentType
+from app.models.business_documents.upload import BusinessDocumentStatus, BusinessDocumentType
 
 
 class ValidationIssue(BaseModel):
@@ -69,3 +69,11 @@ class DocumentTypeSummary(BaseModel):
 class BusinessDocumentSummaryResponse(BaseModel):
     total_documents: int
     by_type: list[DocumentTypeSummary]
+
+
+class FieldSchemaEntry(BaseModel):
+    name: str
+    label: str
+    type: str
+    required: bool
+    item_fields: Optional[list["FieldSchemaEntry"]] = None

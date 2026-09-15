@@ -6,10 +6,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_admin, get_page_params
 from app.core.database import get_db
 from app.models.admin import Admin
-from app.models.business_document import (
-    BusinessDocument,
+from app.models.business_documents.upload import (
     BusinessDocumentStatus,
     BusinessDocumentType,
+    BusinessDocumentUpload,
 )
 from app.schemas.business_document import (
     BusinessDocumentActionResponse,
@@ -18,18 +18,30 @@ from app.schemas.business_document import (
     BusinessDocumentSummaryResponse,
     BusinessDocumentUpdate,
     DocumentTypeSummary,
+    FieldSchemaEntry,
 )
 from app.schemas.common import PageParams
-from app.services.business_documents.field_schemas import DOCUMENT_TYPE_LABELS
+from app.services.business_documents import persistence
+from app.services.business_documents.field_schemas import DOCUMENT_TYPE_LABELS, FIELD_SCHEMAS
 from app.services.business_documents.service import BusinessDocumentService
+from app.tasks.business_document_tasks import process_business_document_task
 
 router = APIRouter(prefix="/admin/business-documents", tags=["Admin Business Documents"])
 
 MAX_FILES_PER_BATCH = 15
 
 
-def _get_document_or_404(document_id: str, db: Session) -> BusinessDocument:
-    document = db.query(BusinessDocument).filter(BusinessDocument.id == document_id).first()
+def to_out(document: BusinessDocumentUpload) -> BusinessDocumentOut:
+
+    out = BusinessDocumentOut.model_validate(document)
+    out.extracted_data = persistence.serialize_fields(document)
+    return out
+
+
+def _get_document_or_404(document_id: str, db: Session) -> BusinessDocumentUpload:
+    document = (
+        db.query(BusinessDocumentUpload).filter(BusinessDocumentUpload.id == document_id).first()
+    )
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     return document
@@ -66,15 +78,13 @@ def upload_business_documents(
             )
 
     service = BusinessDocumentService(db)
-    results: list[BusinessDocument] = []
+    results: list[BusinessDocumentUpload] = []
 
     for file in files:
         try:
             dest_path, content_hash, size_bytes, file_type = service.save_upload(file)
         except ValueError as exc:
-            results.append(
-                _failed_placeholder(db, file.filename or "unknown", str(exc))
-            )
+            results.append(_failed_placeholder(db, file.filename or "unknown", str(exc)))
             continue
 
         duplicate = service.find_completed_duplicate(content_hash)
@@ -86,15 +96,16 @@ def upload_business_documents(
         document = service.create_document_record(
             file, dest_path, content_hash, size_bytes, file_type, requested_type
         )
-        document = service.process_document(document)
+        process_business_document_task.delay(document.id)
         results.append(document)
 
-    return results
+    return [to_out(d) for d in results]
 
 
-def _failed_placeholder(db: Session, filename: str, message: str) -> BusinessDocument:
-    
-    placeholder = BusinessDocument(
+def _failed_placeholder(db: Session, filename: str, message: str) -> BusinessDocumentUpload:
+
+
+    placeholder = BusinessDocumentUpload(
         original_filename=filename,
         stored_filename="",
         file_path="",
@@ -103,7 +114,6 @@ def _failed_placeholder(db: Session, filename: str, message: str) -> BusinessDoc
         content_hash="",
         status=BusinessDocumentStatus.FAILED,
         error_message=message,
-        extracted_data={},
         field_confidence={},
         is_valid=False,
         validation_errors=[],
@@ -123,18 +133,18 @@ def list_business_documents(
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):
-    query = db.query(BusinessDocument)
+    query = db.query(BusinessDocumentUpload)
     if document_type is not None:
-        query = query.filter(BusinessDocument.document_type == document_type)
+        query = query.filter(BusinessDocumentUpload.document_type == document_type)
     if status_filter is not None:
-        query = query.filter(BusinessDocument.status == status_filter)
+        query = query.filter(BusinessDocumentUpload.status == status_filter)
 
-    query = query.order_by(BusinessDocument.uploaded_at.desc())
+    query = query.order_by(BusinessDocumentUpload.uploaded_at.desc())
     total = query.count()
     documents = query.offset(params.offset).limit(params.page_size).all()
 
     return BusinessDocumentListResponse(
-        documents=documents,
+        documents=[to_out(d) for d in documents],
         total=total,
         page=params.page,
         page_size=params.page_size,
@@ -148,27 +158,59 @@ def get_summary(
     admin: Admin = Depends(get_current_admin),
 ):
     by_type: list[DocumentTypeSummary] = []
-    total_documents = db.query(BusinessDocument).count()
+    total_documents = db.query(BusinessDocumentUpload).count()
 
     for doc_type in BusinessDocumentType:
         if doc_type == BusinessDocumentType.UNKNOWN:
             continue
-        base_query = db.query(BusinessDocument).filter(BusinessDocument.document_type == doc_type)
+        base_query = db.query(BusinessDocumentUpload).filter(
+            BusinessDocumentUpload.document_type == doc_type
+        )
         by_type.append(
             DocumentTypeSummary(
                 document_type=doc_type,
                 label=DOCUMENT_TYPE_LABELS[doc_type],
                 total=base_query.count(),
                 needs_review=base_query.filter(
-                    BusinessDocument.status == BusinessDocumentStatus.NEEDS_REVIEW
+                    BusinessDocumentUpload.status == BusinessDocumentStatus.NEEDS_REVIEW
                 ).count(),
                 failed=base_query.filter(
-                    BusinessDocument.status == BusinessDocumentStatus.FAILED
+                    BusinessDocumentUpload.status == BusinessDocumentStatus.FAILED
                 ).count(),
             )
         )
 
     return BusinessDocumentSummaryResponse(total_documents=total_documents, by_type=by_type)
+
+
+@router.get("/field-schema", response_model=dict[str, list[FieldSchemaEntry]])
+def get_field_schemas():
+
+    return {
+        doc_type.value: [
+            FieldSchemaEntry(
+                name=name,
+                label=spec["label"],
+                type=spec["type"],
+                required=spec.get("required", False),
+                item_fields=(
+                    [
+                        FieldSchemaEntry(
+                            name=sub_name,
+                            label=sub_spec["label"],
+                            type=sub_spec["type"],
+                            required=sub_spec.get("required", False),
+                        )
+                        for sub_name, sub_spec in spec["item_fields"].items()
+                    ]
+                    if spec["type"] == "object_list"
+                    else None
+                ),
+            )
+            for name, spec in schema.items()
+        ]
+        for doc_type, schema in FIELD_SCHEMAS.items()
+    }
 
 
 @router.get("/{document_id}", response_model=BusinessDocumentOut)
@@ -177,7 +219,7 @@ def get_business_document(
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):
-    return _get_document_or_404(document_id, db)
+    return to_out(_get_document_or_404(document_id, db))
 
 
 @router.patch("/{document_id}", response_model=BusinessDocumentOut)
@@ -187,6 +229,7 @@ def update_business_document(
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):
+
     document = _get_document_or_404(document_id, db)
     if document.document_type == BusinessDocumentType.UNKNOWN:
         raise HTTPException(
@@ -194,7 +237,8 @@ def update_business_document(
             detail="This document's type couldn't be identified, so its fields can't be edited.",
         )
     service = BusinessDocumentService(db)
-    return service.apply_manual_correction(document, payload.fields)
+    updated = service.apply_manual_correction(document, payload.fields)
+    return to_out(updated)
 
 
 @router.post("/{document_id}/reprocess", response_model=BusinessDocumentOut)
@@ -204,8 +248,10 @@ def reprocess_business_document(
     admin: Admin = Depends(get_current_admin),
 ):
     document = _get_document_or_404(document_id, db)
-    service = BusinessDocumentService(db)
-    return service.process_document(document)
+    document.status = BusinessDocumentStatus.PENDING
+    db.commit()
+    process_business_document_task.delay(document.id)
+    return to_out(document)
 
 
 @router.delete("/{document_id}", response_model=BusinessDocumentActionResponse)
