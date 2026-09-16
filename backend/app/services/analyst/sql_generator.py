@@ -168,9 +168,6 @@ def _format_history(history: list[dict[str, str]], limit: int = 6) -> str:
 
         lines.append(f"{role}: {content}")
 
-        # Including the SQL from previous turns is what makes "break that down
-        # by month" work — the model can extend the actual previous query
-        # rather than guessing at the filters from the prose answer.
         previous_sql = turn.get("sql")
         if previous_sql:
             lines.append(f"(SQL used: {previous_sql})")
@@ -244,8 +241,6 @@ def generate_answer(
 ) -> str:
     llm = get_llm_service()
 
-    # Only the first rows are needed to characterise the result, and this keeps
-    # a 500-row table from blowing up the prompt.
     preview = rows[:30]
 
     result_block = {

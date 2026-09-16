@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 from app.services.analyst.schema_catalog import ALLOWED_TABLES
 
-# Statement types that may never appear, in any position.
 FORBIDDEN_KEYWORDS: frozenset[str] = frozenset(
     {
         # DML / DDL
@@ -23,8 +22,6 @@ FORBIDDEN_KEYWORDS: frozenset[str] = frozenset(
     }
 )
 
-# Schemas/prefixes that must never be touched even if someone adds a table
-# with a colliding name to the catalog.
 FORBIDDEN_SCHEMA_PREFIXES: tuple[str, ...] = ("pg_", "information_schema")
 
 MAX_QUERY_LENGTH = 6000
@@ -42,27 +39,18 @@ class GuardResult:
 
 
 def _strip_comments(sql: str) -> str:
-    """Remove -- line comments and /* */ block comments."""
     sql = re.sub(r"/\*.*?\*/", " ", sql, flags=re.DOTALL)
     sql = re.sub(r"--[^\n]*", " ", sql)
     return sql
 
 
 def _mask_string_literals(sql: str) -> str:
-    """
-    Replace the contents of quoted literals with a placeholder so keyword
-    scanning can't be fooled by (or trip over) literal text.
-    """
     sql = re.sub(r"'(?:[^']|'')*'", "''", sql)
     sql = re.sub(r'"(?:[^"]|"")*"', '""', sql)
     return sql
 
 
 def _split_single_statement(sql: str) -> str:
-    """
-    Enforce exactly one statement. A single trailing semicolon is fine;
-    anything with content after it is a stacked query.
-    """
     parts = [part for part in sql.split(";")]
 
     if len(parts) > 1 and any(part.strip() for part in parts[1:]):
@@ -179,8 +167,6 @@ def validate_sql(raw_sql: str, max_rows: int = 500) -> GuardResult:
             f"Query contains a forbidden operation: {', '.join(sorted(forbidden_hits))}."
         )
 
-    # `SELECT ... INTO new_table` writes; catch it explicitly since INTO is
-    # also legitimate in other dialects' contexts.
     if re.search(r"\binto\b", masked, re.IGNORECASE):
         raise UnsafeSQLError("SELECT ... INTO is not allowed.")
 

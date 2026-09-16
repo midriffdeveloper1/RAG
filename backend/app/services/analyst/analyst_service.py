@@ -24,7 +24,7 @@ class ChartSpec:
 @dataclass
 class AnalystAnswer:
     answer: str
-    status: str  # "ok" | "out_of_scope" | "needs_clarification" | "blocked" | "error"
+    status: str  
     sql: str | None = None
     intent: str | None = None
     columns: list[str] = field(default_factory=list)
@@ -94,11 +94,9 @@ class AnalystService:
                 status="needs_clarification",
             )
 
-        # --- 1. Understand + generate -------------------------------------
         try:
             plan = sql_generator.generate_sql_plan(question, history)
         except RuntimeError as exc:
-            # LLMService raises this when no API key is configured.
             raise
         except ValueError as exc:
             logger.warning("Analyst planning failed: %s", exc)
@@ -134,7 +132,6 @@ class AnalystService:
                 status="error",
             )
 
-        # --- 2. Validate + 3. Execute (with one repair attempt) -----------
         attempt = 0
         last_error: str | None = None
         current_sql = plan.sql
@@ -196,7 +193,6 @@ class AnalystService:
 
                 current_sql = repaired
 
-        # --- 4. Analyze + 5. Answer ---------------------------------------
         try:
             answer_text = sql_generator.generate_answer(
                 question=question,
@@ -205,7 +201,7 @@ class AnalystService:
                 rows=result.rows,
                 truncated=result.truncated,
             )
-        except Exception as exc:  # noqa: BLE001 - never lose a good result to a bad summary
+        except Exception as exc:  
             logger.warning("Answer generation failed, falling back: %s", exc)
             answer_text = self._fallback_answer(result.columns, result.rows)
 
@@ -280,7 +276,6 @@ class AnalystService:
 
     @staticmethod
     def _fallback_answer(columns: list[str], rows: list[list[Any]]) -> str:
-        """Deterministic answer used when the summarising LLM call fails."""
         if not rows:
             return "No matching documents were found for that question."
 

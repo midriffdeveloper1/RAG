@@ -1,23 +1,3 @@
-"""
-The analyst agent's view of the database.
-
-This module is deliberately a *hand-written allowlist* rather than something
-derived from `Base.metadata`. Two reasons:
-
-1. **Scope.** The agent is only allowed to answer questions about business
-   documents (invoices, receipts, POs, resumes, expense reports, application
-   forms, contracts). Reflecting the full metadata would expose `admins`,
-   `customers`, `chat_messages`, etc. — none of which are in scope, and some
-   of which hold credentials or personal conversation history.
-
-2. **Safety.** `sql_guard.py` validates generated SQL against exactly this
-   allowlist. If a table isn't named here, the guard rejects any query that
-   references it. Adding a table to the agent's reach is therefore a
-   deliberate, reviewable edit to this file — never an accident.
-
-Anything not listed here is invisible and unreachable to the agent.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -38,8 +18,6 @@ class TableInfo:
     joins: list[str] = field(default_factory=list)
 
 
-# Shared column blocks -------------------------------------------------------
-
 _LINE_ITEM_COLUMNS = [
     ColumnInfo("id", "text"),
     ColumnInfo("position", "integer", "ordering within the parent document"),
@@ -51,7 +29,6 @@ _LINE_ITEM_COLUMNS = [
 
 
 SCHEMA: dict[str, TableInfo] = {
-    # --- parent upload table ------------------------------------------------
     "business_document_uploads": TableInfo(
         name="business_document_uploads",
         description=(
@@ -83,7 +60,7 @@ SCHEMA: dict[str, TableInfo] = {
             ColumnInfo("processed_at", "timestamp"),
         ],
     ),
-    # --- invoices -----------------------------------------------------------
+    
     "invoices": TableInfo(
         name="invoices",
         description="Extracted invoice header data. One row per invoice document.",
@@ -111,7 +88,7 @@ SCHEMA: dict[str, TableInfo] = {
         columns=[ColumnInfo("invoice_id", "text", "FK -> invoices.id")] + _LINE_ITEM_COLUMNS,
         joins=["invoice_line_items.invoice_id = invoices.id"],
     ),
-    # --- receipts -----------------------------------------------------------
+
     "receipts": TableInfo(
         name="receipts",
         description="Extracted receipt data. One row per receipt document.",
@@ -137,7 +114,7 @@ SCHEMA: dict[str, TableInfo] = {
         columns=[ColumnInfo("receipt_id", "text", "FK -> receipts.id")] + _LINE_ITEM_COLUMNS,
         joins=["receipt_items.receipt_id = receipts.id"],
     ),
-    # --- purchase orders ----------------------------------------------------
+
     "purchase_orders": TableInfo(
         name="purchase_orders",
         description="Extracted purchase order header data.",
@@ -165,7 +142,7 @@ SCHEMA: dict[str, TableInfo] = {
         + _LINE_ITEM_COLUMNS,
         joins=["purchase_order_line_items.purchase_order_id = purchase_orders.id"],
     ),
-    # --- resumes ------------------------------------------------------------
+
     "resumes": TableInfo(
         name="resumes",
         description="Extracted candidate resume data.",
@@ -218,7 +195,7 @@ SCHEMA: dict[str, TableInfo] = {
         ],
         joins=["resume_experience.resume_id = resumes.id"],
     ),
-    # --- expense reports ----------------------------------------------------
+
     "expense_reports": TableInfo(
         name="expense_reports",
         description="Extracted expense report header data.",
@@ -251,7 +228,7 @@ SCHEMA: dict[str, TableInfo] = {
         ],
         joins=["expense_report_items.expense_report_id = expense_reports.id"],
     ),
-    # --- application forms --------------------------------------------------
+
     "application_forms": TableInfo(
         name="application_forms",
         description="Extracted application form data.",
@@ -269,7 +246,7 @@ SCHEMA: dict[str, TableInfo] = {
         ],
         joins=["application_forms.upload_id = business_document_uploads.id"],
     ),
-    # --- contracts ----------------------------------------------------------
+
     "contracts": TableInfo(
         name="contracts",
         description="Extracted contract data.",
@@ -312,7 +289,6 @@ ALLOWED_COLUMNS: frozenset[str] = frozenset(
 
 
 def render_schema_prompt() -> str:
-    """Render the allowlist as a compact DDL-ish block for the LLM prompt."""
     lines: list[str] = []
 
     for table in SCHEMA.values():
