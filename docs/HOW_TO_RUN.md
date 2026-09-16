@@ -112,8 +112,9 @@ Once the API, Celery worker, and frontend are all running:
 4. **Staff** page — add staff and link them to the services they perform.
 5. **Knowledge Base** page — upload FAQ/policy documents (PDF/DOCX) to power the RAG-backed Knowledge Agent. Confirm the worker picked it up (status moves past `pending`).
 6. **Business management → Upload documents** page — optionally try the business-document pipeline (invoice/receipt/etc.) with a sample file.
-7. **Chatbot Config** page — set the assistant's persona/tone, and (if you have a Deepgram key) enable voice and pick a voice.
-8. Open the public widget (`Home.jsx` route) and try a chat — then try a voice call if enabled.
+7. **Data analyst** page — ask something like "how many invoices did we receive last month?" to confirm the agent can reach your data. Needs `OPENAI_API_KEY`; no extra setup beyond `alembic upgrade head`.
+8. **Chatbot Config** page — set the assistant's persona/tone, and (if you have a Deepgram key) enable voice and pick a voice.
+9. Open the public widget (`Home.jsx` route) and try a chat — then try a voice call if enabled.
 
 ## 5. Real phone calls — currently not wired up
 
@@ -146,6 +147,7 @@ cd frontend && npm run dev
 | Chat says "assistant isn't configured yet" (HTTP 503) | `OPENAI_API_KEY` missing/invalid (this replaced `GROQ_API_KEY` as the required key — see Status in the README) |
 | Business-document/KB uploads stay stuck on "pending" | No Celery worker running, or Redis isn't reachable — see `CELERY_SETUP.md` |
 | Appointment booked but no confirmation email / no admin notification | Same as above — email/notifications are dispatched via a Celery task, not inline |
+| Data analyst replies "outside what this assistant is allowed to do" | Expected for anything beyond the seven business document types — that's the scope guard, not a bug. See `AI_DATA_ANALYST.md`. |
 | Voice call button does nothing / 503 | `DEEPGRAM_API_KEY` missing, or `voice_enabled` off in Chatbot Config |
 | CORS errors in the browser console | Frontend origin not in `CORS_ORIGINS` |
 | Phone calls don't connect / route not found | Expected in this snapshot — the telephony router isn't mounted yet. See "Real phone calls" above and `VOICE_AND_TELEPHONY.md`. |

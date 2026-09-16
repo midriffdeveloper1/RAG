@@ -11,6 +11,7 @@ import BusinessDocumentTypePage from "./pages/admin/BusinessManagement/BusinessD
 import AdminChatbotConfigPage from "./pages/admin/AdminChatbotConfigPage.jsx";
 import AdminConversationsPage from "./pages/admin/AdminConversationsPage.jsx";
 import AdminCustomersPage from "./pages/admin/AdminCustomersPage.jsx";
+import AdminDataAnalystPage from "./pages/admin/AdminDataAnalystPage.jsx";
 import AdminKnowledgeBasePage from "./pages/admin/AdminKnowledgeBasePage.jsx";
 import AdminOverview from "./pages/admin/AdminOverview.jsx";
 import AdminServicesPage from "./pages/admin/AdminServicesPage.jsx";
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="business" element={<AdminBusinessPage />} />
             <Route path="business-management/upload" element={<BusinessDocumentUploadPage />} />
             <Route path="business-management/:docPath" element={<BusinessDocumentTypePage />} />
+            <Route path="data-analyst" element={<AdminDataAnalystPage />} />
             <Route path="chatbot-config" element={<AdminChatbotConfigPage />} />
           </Route>
         </Routes>

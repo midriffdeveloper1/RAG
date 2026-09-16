@@ -350,3 +350,34 @@ export async function markAllNotificationsRead() {
 export async function deleteNotification(notificationId) {
   await apiClient.delete(`/admin/notifications/${notificationId}`);
 }
+
+// --- AI data analyst (admin-only) --------------------------------------
+
+export async function askAnalyst({ question, sessionId = null }) {
+  const { data } = await apiClient.post("/admin/analyst/ask", {
+    question,
+    session_id: sessionId,
+  });
+  return data;
+}
+
+export async function getAnalystScope() {
+  const { data } = await apiClient.get("/admin/analyst/scope");
+  return data;
+}
+
+export async function listAnalystSessions({ page = 1, pageSize = 20 } = {}) {
+  const { data } = await apiClient.get("/admin/analyst/sessions", {
+    params: { page, page_size: pageSize },
+  });
+  return data;
+}
+
+export async function getAnalystSession(sessionId) {
+  const { data } = await apiClient.get(`/admin/analyst/sessions/${sessionId}`);
+  return data;
+}
+
+export async function deleteAnalystSession(sessionId) {
+  await apiClient.delete(`/admin/analyst/sessions/${sessionId}`);
+}

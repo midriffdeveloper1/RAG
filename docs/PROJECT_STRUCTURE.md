@@ -40,6 +40,7 @@ backend/
 │   │   ├── document_chunk.py         # RAG chunks + pgvector embedding column
 │   │   ├── support_ticket.py         # Human-handoff tickets
 │   │   ├── notification.py           # Notification (admin notification-bell items)
+│   │   ├── analyst_session.py        # AnalystSession + AnalystMessage (admin AI SQL analyst threads)
 │   │   ├── business_document.py      # LEGACY — original single-table `BusinessDocument`/`business_documents`. Superseded by `business_documents/upload.py`; not imported by `alembic/env.py` or by the current service/extraction/routes code, but a few helper modules (`scoring.py`, `validation.py`, `field_schemas.py`) still import its `BusinessDocumentType` enum. See `BUSINESS_DOCUMENT_EXTRACTION.md`.
 │   │   └── business_documents/       # Current business-document schema (normalized, one table set per document type)
 │   │       ├── upload.py               # BusinessDocumentUpload — the parent row per uploaded file (status, confidence, file metadata)
@@ -53,6 +54,7 @@ backend/
 │   │
 │   ├── schemas/                    # Pydantic request/response models, one per domain
 │   │   ├── ...                       # (business.py, appointment.py, chat.py, etc. — one per resource)
+│   │   ├── analyst.py                # Request/response schemas for the data-analyst endpoints
 │   │   ├── business_document.py      # Request/response schemas for the business-document endpoints
 │   │   ├── document_extraction.py    # Shared extraction-result shapes
 │   │   └── notification.py           # Notification list/response schemas
@@ -89,6 +91,12 @@ backend/
 │   │   │   ├── support_agent.py       # Human handoff / ticket messaging
 │   │   │   ├── tool_loop.py           # Generic "LLM + tool calling" loop shared by agents (via LLMService → OpenAI)
 │   │   │   └── shared_context.py      # Common context (business info, services, etc.) built once per turn
+│   │   ├── analyst/                  # AI SQL & data analyst agent (see AI_DATA_ANALYST.md)
+│   │   │   ├── schema_catalog.py      # Hand-written table/column ALLOWLIST — the agent's whole view of the DB
+│   │   │   ├── sql_guard.py           # SQL validation: SELECT-only, single statement, allowlisted tables
+│   │   │   ├── executor.py            # Runs SQL on a dedicated READ ONLY connection with a timeout
+│   │   │   ├── sql_generator.py       # Prompts: question -> SQL plan; result -> plain-English answer
+│   │   │   └── analyst_service.py     # Orchestration, one-shot SQL repair, chart verification
 │   │   ├── business_documents/       # Business-document pipeline (see BUSINESS_DOCUMENT_EXTRACTION.md)
 │   │   │   ├── field_schemas.py        # Per-document-type field schema — drives the extraction prompt, validation, and persistence
 │   │   │   ├── extraction.py           # LLM classification + extraction (text and image/vision paths)
@@ -197,6 +205,7 @@ frontend/
     │       ├── AdminKnowledgeBasePage.jsx# Document upload/list (RAG)
     │       ├── AdminChatbotConfigPage.jsx# Persona/voice/feature toggle editor
     │       ├── AdminConversationsPage.jsx# Conversation review + resolve/reopen
+    │       ├── AdminDataAnalystPage.jsx  # AI SQL analyst chat: thread rail, composer, results
     │       └── BusinessManagement/
     │           ├── BusinessDocumentUploadPage.jsx  # The one place to upload business documents (drag/drop, batch results)
     │           └── BusinessDocumentTypePage.jsx    # Reused for all 7 types via businessDocumentTypes.js — record table + "Upload" deep link
@@ -218,6 +227,10 @@ frontend/
     │   │   ├── VoiceCallModal.jsx       # Modal wrapper around the voice call UI
     │   │   └── VoiceCallWidget.jsx      # The real-time voice call UI (mic, waveform, call state)
     │   ├── Admin/                    # One component set per admin resource (lists, modals, forms)
+    │   ├── Analyst/                  # AI data analyst UI
+    │   │   ├── AnalystMessage.jsx       # Answer + chart + table + collapsible SQL inspector
+    │   │   ├── AnalystResultTable.jsx   # Adapts to result shape: metric / record / sortable table + CSV
+    │   │   └── AnalystChart.jsx         # Hand-rolled inline SVG bar, line and pie charts (no chart library)
     │   ├── BusinessDocuments/        # Business-document admin UI
     │   │   ├── BusinessDocumentUploadZone.jsx  # Drag/drop + click uploader with live batch results
     │   │   ├── BusinessDocumentTable.jsx       # Paginated per-type record table
@@ -248,6 +261,7 @@ frontend/
     │
     ├── utils/
     │   ├── browserId.js                # Generates/persists a per-browser anonymous ID
+    │   ├── analystFormat.js            # Column-type inference + value formatting for analyst results
     │   ├── businessDocuments.js        # Headline-field extraction, per-type display helpers
     │   ├── time.js                     # Date/time formatting helpers
     │   └── constants.js

@@ -91,6 +91,22 @@ All under `/admin/business-documents`. See `BUSINESS_DOCUMENT_EXTRACTION.md` for
 | POST | `/admin/business-documents/{id}/reprocess` | Re-run extraction against the stored file |
 | DELETE | `/admin/business-documents/{id}` | Delete the record and its file |
 
+## Admin — AI Data Analyst
+
+Natural-language questions over the business document tables. All routes require
+an authenticated admin and are scoped by `admin_id`. See `AI_DATA_ANALYST.md`.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/admin/analyst/scope` | Document types in scope + suggested starter questions |
+| POST | `/admin/analyst/ask` | `{question, session_id?}`. Omit `session_id` to start a thread. Returns the answer plus `sql`, `result_columns`/`result_rows`, and an optional `chart`. `status` is `ok` \| `out_of_scope` \| `needs_clarification` \| `blocked` \| `error`. **503** if `OPENAI_API_KEY` isn't set. |
+| GET | `/admin/analyst/sessions` | Paginated thread list |
+| GET | `/admin/analyst/sessions/{session_id}` | Full thread, with each turn's stored result snapshot |
+| DELETE | `/admin/analyst/sessions/{session_id}` | Delete a thread |
+
+Only `SELECT` reaches the database: generated SQL is validated against a table
+allowlist and executed on a dedicated `READ ONLY` connection.
+
 ## Admin — Notifications
 
 All under `/admin/notifications`.

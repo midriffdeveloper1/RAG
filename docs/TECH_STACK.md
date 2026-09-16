@@ -25,6 +25,13 @@
 ### Why OpenAI now, instead of Groq?
 `app/services/llm_service.py` contains three implementations of `LLMService` stacked in the same file: a Groq version, an OpenRouter version, and an OpenAI version. Only the **OpenAI** one is active (imported/instantiated); the other two are fully commented out but left in place, presumably as a reference for how to switch back or between providers. If you're configuring a fresh `.env`, `OPENAI_API_KEY` is the one that matters — `GROQ_API_KEY`/`OPENROUTER_API_KEY` can be left blank.
 
+### Why no charting library?
+The AI data analyst renders bar, line and pie charts as hand-rolled inline SVG
+(`components/Analyst/AnalystChart.jsx`). The project had no chart dependency, and
+three simple shapes on a single admin-only page didn't justify adding one to the
+bundle. Charts use the admin theme's own sage/clay palette rather than a generic
+chart palette.
+
 ### Why local embeddings?
 Embeddings run locally via `sentence-transformers` so there's no per-query embedding API cost or extra network hop for retrieval, independent of whichever chat-completion provider is wired up.
 
@@ -42,7 +49,7 @@ Document extraction (both RAG ingestion and business-document extraction) involv
 |---|---|---|
 | Framework | **React 18** | |
 | Build tool | **Vite 5** | Dev server + production bundling |
-| Routing | **react-router-dom v6** | Public widget route + `/admin/*` nested routes, including `/admin/business-management/:docPath` for the business-document type tables |
+| Routing | **react-router-dom v6** | Public widget route + `/admin/*` nested routes, including `/admin/business-management/:docPath` for the business-document type tables and `/admin/data-analyst` for the AI SQL analyst |
 | HTTP client | **axios** | Two clients: `services/api.js` (public/customer) and `services/adminApi.js` (authenticated admin) |
 | Markdown rendering | **react-markdown** + **remark-gfm** | Renders assistant replies (which may include lists/links/tables) |
 | Styling | Plain CSS (`styles/index.css`), no CSS framework | One global stylesheet; business-document UI reuses the same design tokens/classes rather than introducing new ones |

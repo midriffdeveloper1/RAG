@@ -551,3 +551,50 @@ export function Info(props) {
     </Svg>
   );
 }
+export function Download(props) {
+  return (
+    <Svg {...props}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </Svg>
+  );
+}
+
+export function Database(props) {
+  return (
+    <Svg {...props}>
+      <ellipse cx="12" cy="5" rx="9" ry="3" />
+      <path d="M3 5v14a9 3 0 0 0 18 0V5" />
+      <path d="M3 12a9 3 0 0 0 18 0" />
+    </Svg>
+  );
+}
+
+export function Sparkles(props) {
+  return (
+    <Svg {...props}>
+      <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" />
+      <path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z" />
+    </Svg>
+  );
+}
+
+export function Code2(props) {
+  return (
+    <Svg {...props}>
+      <polyline points="16 18 22 12 16 6" />
+      <polyline points="8 6 2 12 8 18" />
+    </Svg>
+  );
+}
+
+export function ShieldAlert(props) {
+  return (
+    <Svg {...props}>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </Svg>
+  );
+}

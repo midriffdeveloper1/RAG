@@ -60,6 +60,9 @@ BusinessDocument (legacy) — the original single-table design
                above. Still defined as a model/table but not part of the
                live code path — see the note in "Tables" below.
 
+AnalystSession ──< AnalystMessage
+   (admin-only AI SQL analyst threads; AnalystSession.admin_id -> Admin.id)
+
 ChatbotConfig — singleton row (one config for the whole business)
 Admin — dashboard login
 ```
@@ -128,6 +131,25 @@ RAG pipeline storage:
 ### `notifications`
 Flat table backing the admin notification bell (`app/models/notification.py`). `type` is an enum (`business_document_completed`, `business_document_needs_review`, `business_document_low_confidence`, `business_document_failed`, `kb_document_completed`, `kb_document_failed`, `appointment_booked`, `appointment_cancelled`, `appointment_rescheduled`, `generic`); `severity` is `info`/`success`/`warning`/`error`. `link` and `related_id` are loose, unenforced references back to whatever triggered the notification (no FK). `is_read`/`created_at` drive the bell's unread count and ordering.
 
+### `analyst_sessions` / `analyst_messages`
+Persistence for the admin-only AI SQL & Data Analyst agent (see
+`AI_DATA_ANALYST.md`).
+
+- **`analyst_sessions`** — one conversation thread, owned by an admin
+  (`admin_id`, FK to `admins.id`, `ondelete="CASCADE"`). `title` is the first
+  question asked.
+- **`analyst_messages`** — one row per turn. User turns store just `content`.
+  Assistant turns additionally store `status`, the generated `sql` and `intent`,
+  and a **snapshot of the result** (`result_columns`, `result_rows`, `row_count`,
+  `truncated`, `duration_ms`, `chart`). The snapshot means reopening a thread
+  shows what the admin originally saw rather than re-running the query against
+  data that may have changed; storing the `sql` also lets follow-up questions
+  ("break that down by month") extend the real previous query.
+
+These are deliberately separate from `chat_sessions`/`chat_messages`: that pair
+models a *customer* support conversation (`browser_id`, `customer_id`,
+escalation, `ticket_number`) and is surfaced in the admin Conversations page.
+
 ### `business_document_uploads` and the per-type tables
 The business-document-intelligence pipeline (see `BUSINESS_DOCUMENT_EXTRACTION.md`) uses a **normalized, per-document-type schema**, not one generic table:
 
@@ -162,7 +184,8 @@ The business-document-intelligence pipeline (see `BUSINESS_DOCUMENT_EXTRACTION.m
 | `5266269807d3` | `staff_modal.py` | Staff-related schema adjustments (supports the staff admin modal) |
 | `65c81363ab75` | `staff_modal.py` | Further staff-related schema adjustments |
 | `62d8b09cd61e` | `business_doc.py` | Business-document schema (part 1) |
-| `5b541868256e` | `business_doc.py` | Business-document schema (part 2) — current head |
+| `5b541868256e` | `business_doc.py` | Business-document schema (part 2) |
+| `c3f7a91b4de2` | `analyst_sessions.py` | Creates `analyst_sessions` + `analyst_messages` for the AI data analyst — current head |
 
 To apply migrations:
 ```bash

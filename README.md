@@ -12,6 +12,7 @@ This README is the entry point. See the other docs in this folder for details:
 | [`HOW_TO_RUN.md`](./HOW_TO_RUN.md) | Local setup, env vars, running the API, worker, and frontend |
 | [`VOICE_AND_TELEPHONY.md`](./VOICE_AND_TELEPHONY.md) | The real-time voice agent (browser) and phone-call (Exotel) integration in depth — **includes a current-status caveat, read it before assuming phone calls work** |
 | [`BUSINESS_DOCUMENT_EXTRACTION.md`](./BUSINESS_DOCUMENT_EXTRACTION.md) | The invoice/receipt/PO/resume/expense-report/application-form/contract extraction pipeline |
+| [`AI_DATA_ANALYST.md`](./AI_DATA_ANALYST.md) | The admin-only natural-language SQL & data analyst agent, and how destructive SQL is prevented |
 | [`CELERY_SETUP.md`](./CELERY_SETUP.md) | Background job processing (Celery + Redis) — required for uploads and emails to actually complete |
 | [`API_REFERENCE.md`](./API_REFERENCE.md) | Every REST/WebSocket endpoint, grouped by area |
 
@@ -43,10 +44,11 @@ Under the hood, every customer-facing channel (chat / browser voice / phone) is 
 - **Appointment booking** — real slot availability against staff schedules, opening hours, and holidays; book/reschedule/cancel, all requiring explicit confirmation. Booking/cancelling/rescheduling also enqueues a confirmation email and an admin notification via Celery.
 - **Real-time voice (browser)** — the browser streams the mic directly to Deepgram STT, gets live transcripts, and plays back streaming Deepgram TTS audio — with barge-in (interrupt the AI while it's talking) and end-of-speech detection.
 - **Business document intelligence** — a separate admin pipeline: upload an invoice/receipt/PO/resume/expense report/application form/contract (PDF, DOCX, or a photo), and an LLM classifies + extracts it into structured, per-type database tables an admin can review, correct, and audit. Runs in the background via Celery. See `BUSINESS_DOCUMENT_EXTRACTION.md`.
+- **AI SQL & data analyst (admin-only)** — an admin asks "how many invoices did we receive last month?" or "which product generated the most revenue in the last 6 months?" in plain English; the agent inspects an allowlisted schema, writes PostgreSQL, validates it, runs it read-only, and replies with a sentence, a formatted table, and a chart where one helps. Destructive SQL is blocked at two independent layers. See `AI_DATA_ANALYST.md`.
 - **Admin notification bell** — in-app notifications for completed/failed document processing, low-confidence extractions, and appointment activity.
 - **Background job processing (Celery + Redis)** — document extraction, KB indexing, and outbound email all run as background tasks rather than blocking API requests. **A worker must be running** for these to complete — see `CELERY_SETUP.md`.
 - **Human handoff** — chat/voice can escalate to a support ticket (keyword/LLM-detected frustration, repeated failures, or unclear speech on the phone channel). Booking/reschedule/cancel actions always require an explicit "yes."
-- **Full admin dashboard** — manage services, staff, business info, holidays, chatbot persona/voice config, knowledge base documents, business documents, customers, appointments, conversations (with the ability to resolve/reopen), notifications, and basic analytics.
+- **Full admin dashboard** — manage services, staff, business info, holidays, chatbot persona/voice config, knowledge base documents, business documents, customers, appointments, conversations (with the ability to resolve/reopen), notifications, basic analytics, and the natural-language data analyst.
 - **Real phone calls (Exotel)** — the code (`app/api/routes/telephony.py`, `app/realtime/telephony_*.py`) is written to bridge a live phone call's audio to Deepgram STT/TTS through the exact same agent pipeline, but it is **currently disconnected from the running app** — see Status below and the caveat at the top of `VOICE_AND_TELEPHONY.md`.
 
 ## Status — please read before assuming everything below is live

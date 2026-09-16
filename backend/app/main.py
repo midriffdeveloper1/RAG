@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
     admin_chat_sessions,
+    analyst,
     analytics,
     appointments,
     auth,
@@ -82,6 +83,7 @@ app.include_router(admin_chat_sessions.router, prefix=settings.api_v1_prefix)
 app.include_router(support_tickets.router, prefix=settings.api_v1_prefix)
 app.include_router(voice.router, prefix=settings.api_v1_prefix)
 app.include_router(notifications.router, prefix=settings.api_v1_prefix)
+app.include_router(analyst.router, prefix=settings.api_v1_prefix)
 
 @app.get("/")
 def root():

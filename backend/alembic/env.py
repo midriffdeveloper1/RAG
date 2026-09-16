@@ -25,6 +25,7 @@ from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.support_ticket import SupportTicket
 from app.models.notification import Notification
+from app.models.analyst_session import AnalystMessage, AnalystSession
 from app.models.business_documents import (
     ApplicationForm,
     BusinessDocumentUpload,
