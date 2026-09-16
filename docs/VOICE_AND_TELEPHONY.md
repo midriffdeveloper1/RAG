@@ -1,5 +1,16 @@
 # Voice & Telephony Architecture
 
+> ## ⚠️ Current status — read this first
+>
+> This document describes the **designed** architecture for both channels. As of this snapshot:
+>
+> - **Browser voice call — live**, with one caveat: the unclear-speech/clarification logic described in §1 below (`is_unclear_transcript`, `clarification_turn`, `escalate_for_unclear_speech`) is **not actually called from `app/api/routes/voice.py`**. The live WS handler sends every final transcript straight to `stream_turn()`. Those functions exist in `app/realtime/tool_bridge.py` and are fully implemented — they're just currently only wired into the phone path below, which itself isn't reachable. So today, a mumbled/low-confidence answer on a browser call is *not* caught and clarified; it goes straight to an agent like any other transcript.
+> - **Phone call (Exotel) — built, but not reachable.** `app/api/routes/telephony.py` is a complete implementation of everything in §2, but:
+>   1. `telephony.router` is **not registered** in `app/main.py` — the `/api/v1/telephony/*` routes simply don't exist on a running server.
+>   2. The settings `telephony.py` reads (`telephony_enabled`, `telephony_sample_rate`, `exotel_stream_username`, `exotel_stream_password`, `public_websocket_host`, `voice_min_confidence`, `voice_unclear_max_attempts`) are **not defined** on the `Settings` class in `app/core/config.py`, and aren't in `.env.example` either. Even after mounting the router, the first request would raise `AttributeError` on `settings.telephony_enabled`.
+>
+> To make phone calls actually work: add the missing fields to `Settings`, register `telephony.router` in `main.py` (alongside the other routers), and add the corresponding variables to `.env`/`.env.example`. To bring the browser channel in line with the design below, call `is_unclear_transcript()`/`clarification_turn()`/`escalate_for_unclear_speech()` from `voice.py`'s WS loop the same way `telephony.py` already does. Neither of these has been done in this snapshot — treat the rest of this document as the target design, not a description of what a fresh `uvicorn app.main:app` currently does end-to-end.
+
 There are two real-time voice channels in this app, and both end up driving **the same agent pipeline** (`ConversationService` → `OrchestratorService` → Knowledge/Booking/Support agents) that text chat uses:
 
 1. **Browser voice call** — a customer clicks "call" in the web widget and talks to the AI through their mic/speakers.
@@ -65,7 +76,7 @@ When Deepgram emits a `SpeechStarted` VAD event while the assistant is speaking,
 1. Stops/clears its local audio playback queue immediately
 2. Ignores any further audio that was already in flight for the interrupted reply
 
-### Unclear speech & confirmation safety (added this session)
+### Unclear speech & confirmation safety (designed; not yet wired into the browser WS handler — see status note at the top of this doc)
 - Every final transcript from Deepgram carries a **confidence score**. `tool_bridge.is_unclear_transcript()` checks that score (default threshold `0.55`, `VOICE_MIN_CONFIDENCE`) and also filters out filler-only "transcripts" (um/uh/hmm).
 - An unclear transcript **never reaches an agent**. Instead `clarification_turn()` asks the caller to repeat themselves (varying the phrasing across attempts) and the attempt is *not* held against them once they get through clearly.
 - After `VOICE_UNCLEAR_MAX_ATTEMPTS` (default `2`) consecutive unclear attempts, `escalate_for_unclear_speech()` hands the call off to a human via the normal ticketing system instead of continuing to guess.
@@ -143,7 +154,10 @@ PUBLIC_WEBSOCKET_HOST=your-domain.example
 ```
 Point Exotel's Voicebot Applet at `wss://<host>/api/v1/telephony/exotel/stream` (static), or use the dynamic-URL option against `POST /api/v1/telephony/exotel/stream-url`.
 
+> None of the five variables above currently have a matching field on `Settings` (`app/core/config.py`) or an entry in `.env.example` — `telephony.py` reads `settings.telephony_enabled`, `settings.telephony_sample_rate`, `settings.exotel_stream_username`, `settings.exotel_stream_password`, and `settings.public_websocket_host`, none of which exist yet. Add them to the `Settings` class (with sensible defaults, e.g. `telephony_enabled: bool = False`) before setting these in `.env` — otherwise they're silently ignored by `pydantic-settings` (`extra="ignore"`) and the route will fail with `AttributeError` the moment it's hit.
+
 ### Known limitations / things to verify against a live account
+- **The router isn't registered yet.** `app/main.py` includes every other router (`health`, `auth`, `documents`, `business_documents`, `voice`, etc.) but not `telephony` — add `app.include_router(telephony.router, prefix=settings.api_v1_prefix)` before any of this is reachable.
 - This integration was built directly against Exotel's published AgentStream protocol docs but has **not been tested against a live Exotel account** in this environment (no network access) — verify chunk-size tolerances and auth behavior against a real call before going to production.
 - Spoken email addresses ("john at gmail dot com") rely on Deepgram's `smart_format` normalization to become `john@gmail.com` for onboarding — this is a shared limitation with the browser voice channel, not something new to telephony.
 - Outbound calling (the AI calling a customer) is not implemented — only inbound calls to the business's ExoPhone.

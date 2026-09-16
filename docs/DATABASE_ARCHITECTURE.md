@@ -38,6 +38,28 @@ SupportTicket (human handoff; session_id references ChatSession.id but is NOT
                an FK — the session's messages are deleted/archived into the
                ticket's transcript_json when escalation happens)
 
+Notification — flat table, admin notification bell (no FK; related_id is a
+               loose reference to whatever triggered it)
+
+BusinessDocumentUpload (one row per uploaded business document — file
+                        metadata, classification, confidence, validation)
+ ├── invoice          → Invoice ──┬── invoice_line_items
+ ├── receipt          → Receipt ──┴── receipt_items
+ ├── purchase_order   → PurchaseOrder ── purchase_order_line_items
+ ├── resume           → Resume ──┬── resume_education
+ │                                └── resume_experience
+ ├── expense_report   → ExpenseReport ── expense_report_items
+ ├── application_form → ApplicationForm
+ └── contract         → Contract ── contract_signatories
+   (each is a 1:1 relationship, keyed on upload_id; only the row matching
+    the upload's classified document_type actually gets created)
+
+BusinessDocument (legacy) — the original single-table design
+               (business_documents, with a JSON extracted_data column).
+               Superseded by BusinessDocumentUpload + the per-type tables
+               above. Still defined as a model/table but not part of the
+               live code path — see the note in "Tables" below.
+
 ChatbotConfig — singleton row (one config for the whole business)
 Admin — dashboard login
 ```
@@ -103,6 +125,28 @@ RAG pipeline storage:
 - **`documents`** — one row per uploaded file, with `status` (`pending` → `processing` → `completed`/`failed`), `content_hash` (dedup), `chunk_count`, `version`.
 - **`document_chunks`** — one row per chunk: `text`, `source`, `chunk_index`, `version`, and an **`embedding` column of type `Vector(EMBEDDING_DIMENSION)`** (pgvector), used for cosine-similarity search at query time. `EMBEDDING_DIMENSION` defaults to `384` (matching `sentence-transformers/multi-qa-MiniLM-L6-cos-v1`). Deleting a `Document` cascades to its chunks (`ondelete="CASCADE"`).
 
+### `notifications`
+Flat table backing the admin notification bell (`app/models/notification.py`). `type` is an enum (`business_document_completed`, `business_document_needs_review`, `business_document_low_confidence`, `business_document_failed`, `kb_document_completed`, `kb_document_failed`, `appointment_booked`, `appointment_cancelled`, `appointment_rescheduled`, `generic`); `severity` is `info`/`success`/`warning`/`error`. `link` and `related_id` are loose, unenforced references back to whatever triggered the notification (no FK). `is_read`/`created_at` drive the bell's unread count and ordering.
+
+### `business_document_uploads` and the per-type tables
+The business-document-intelligence pipeline (see `BUSINESS_DOCUMENT_EXTRACTION.md`) uses a **normalized, per-document-type schema**, not one generic table:
+
+- **`business_document_uploads`** (`BusinessDocumentUpload`) — one row per uploaded file: file metadata (`original_filename`, `stored_filename`, `file_path`, `file_type`, `file_size_bytes`, `content_hash` for dedup), classification (`document_type`, `type_confidence`, `requested_document_type`), processing `status` (`pending → processing → completed/needs_review/failed`), and extraction/validation metadata that isn't business data itself (`field_confidence`, `confidence_score`, `is_valid`, `validation_errors`, `missing_fields`, `reviewed`).
+- One child table per document type, each with a 1:1 relationship back to its `BusinessDocumentUpload` via `upload_id` (`ondelete="CASCADE"`), holding the actual extracted business fields:
+  | Document type | Parent table | Line-item child table(s) |
+  |---|---|---|
+  | Invoice | `invoices` | `invoice_line_items` |
+  | Receipt | `receipts` | `receipt_items` |
+  | Purchase order | `purchase_orders` | `purchase_order_line_items` |
+  | Resume | `resumes` | `resume_education`, `resume_experience` |
+  | Expense report | `expense_reports` | `expense_report_items` |
+  | Application form | `application_forms` | — (flat + a JSON `additional_fields` catch-all) |
+  | Contract | `contracts` | `contract_signatories` |
+
+  Only the child row matching the upload's classified `document_type` is ever created for a given upload. `app/services/business_documents/persistence.py` reads/writes these tables generically, driven by the field schema in `app/services/business_documents/field_schemas.py`.
+
+> **⚠️ Superseded model, still in the tree:** `app/models/business_document.py` defines an earlier, single-table design (`business_documents`, with `extracted_data`/`field_confidence`/etc. stored as JSON blobs) that the code has since moved away from. `alembic/env.py` and the current `service.py`/`extraction.py`/routes all use `BusinessDocumentUpload` (the normalized design above) — the old `business_documents` table isn't written to by any live code path. A few lower-level helper modules (`scoring.py`, `validation.py`, `field_schemas.py`) still import their `BusinessDocumentType` enum from the old `business_document.py` file rather than from `business_documents/upload.py`; the two enums currently have identical values, so this works, but it's a latent trap if they ever drift apart.
+
 ---
 
 ## Migration history (Alembic, in order)
@@ -115,12 +159,14 @@ RAG pipeline storage:
 | `701843f3cf0e` | `document_chunk.py` | Creates `document_chunks` (pgvector column) |
 | `ea36d4ff536e` | `voice_model.py` | Adds voice/channel columns: `chat_messages.channel`/`message_type`, `chat_sessions.channel`/`voice_session_id`, `chatbot_config.voice_enabled`/`voice_name`/`voice_greeting_message` |
 | `e877e8567ad6` | `bargein.py` | Adds `chatbot_config.barge_in_enabled` |
-
-**No new migration was needed for the latest work** (unclear-speech handling and Exotel telephony) — both reuse existing columns (`chat_sessions.voice_session_id` now also holds an Exotel call/stream SID for phone calls; `unresolved_streak`/`needs_human` drive escalation the same way for phone as for chat).
+| `5266269807d3` | `staff_modal.py` | Staff-related schema adjustments (supports the staff admin modal) |
+| `65c81363ab75` | `staff_modal.py` | Further staff-related schema adjustments |
+| `62d8b09cd61e` | `business_doc.py` | Business-document schema (part 1) |
+| `5b541868256e` | `business_doc.py` | Business-document schema (part 2) — current head |
 
 To apply migrations:
 ```bash
-cd backend/backend
+cd backend
 alembic upgrade head
 ```
 
@@ -129,3 +175,5 @@ To create a new migration after changing a model:
 alembic revision --autogenerate -m "describe the change"
 alembic upgrade head
 ```
+
+Note that `alembic/env.py` imports models explicitly (not via `app/models/__init__.py`, which itself does **not** import `Notification`, `BusinessDocument`, or anything under `business_documents/`) — if you add a new model, make sure it's imported in `alembic/env.py` (or added to `app/models/__init__.py` and re-exported there) or `--autogenerate` won't see it.

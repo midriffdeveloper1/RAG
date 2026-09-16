@@ -62,10 +62,12 @@ explicitly — both default to `REDIS_URL` if unset.
 
 ## 3. Install the Python packages
 
-Already added to `requirements.txt` (`celery`, `redis`):
+> ⚠️ **Not actually in `requirements.txt` yet**, despite this section previously saying so — `celery` and `redis` are used throughout `app/core/celery_app.py`, `app/tasks/*`, and are imported wherever `.delay(...)` is called, but neither package is listed in `backend/requirements.txt` in this snapshot. Install them explicitly until that's fixed:
+
 ```bash
 cd backend
 pip install -r requirements.txt
+pip install celery redis
 ```
 
 ## 4. Run a worker
@@ -140,7 +142,7 @@ in the FastAPI logs) rather than hanging.
 | `business_documents.process` | `app.tasks.business_document_tasks` | `POST /admin/business-documents/upload`, `POST /{id}/reprocess` |
 | `knowledge_base.process_document` | `app.tasks.knowledge_base_tasks` | `POST /admin/documents/upload` |
 | `knowledge_base.reindex_document` | `app.tasks.knowledge_base_tasks` | `POST /admin/documents/{id}/reindex` |
-| `mail.send` | `app.tasks.mail_tasks` | `AppointmentService` on book/cancel/reschedule/admin edits (see PHASE2 doc) |
+| `mail.send` | `app.tasks.mail_tasks` | `AppointmentService` on book/cancel/reschedule/admin edits — sends the customer email via `mail_service.py`/`mail_templates.py` and, separately, creates the matching admin `Notification` row |
 
 All document-processing tasks retry up to twice (15s backoff) on unexpected
 exceptions (e.g. a transient LLM timeout); `mail.send` retries up to 3 times

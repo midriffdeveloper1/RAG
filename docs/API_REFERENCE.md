@@ -43,6 +43,8 @@ See `VOICE_AND_TELEPHONY.md` for the full event flow.
 
 ## Telephony (Exotel phone calls)
 
+> **⚠️ Not currently live.** `app/api/routes/telephony.py` implements both endpoints below, but the router is **not registered in `app/main.py`**, so neither path actually exists on a running server right now, and the `Settings` fields it depends on (`telephony_enabled`, `exotel_stream_username`/`password`, `public_websocket_host`, etc.) aren't defined yet either. Documented here as designed; see `VOICE_AND_TELEPHONY.md` for the full status note.
+
 | Method | Path | Notes |
 |---|---|---|
 | POST | `/telephony/exotel/stream-url` | Optional: returns the `wss://` URL to use, for Exotel's dynamic-URL applet option |
@@ -70,10 +72,36 @@ See `VOICE_AND_TELEPHONY.md` for the full protocol and call lifecycle.
 
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/admin/documents/upload` | Upload a PDF/DOCX — triggers extraction, chunking, embedding |
+| POST | `/admin/documents/upload` | Upload a PDF/DOCX — enqueues a Celery task for extraction, chunking, embedding |
 | GET | `/admin/documents` | List uploaded documents + processing status |
 | POST | `/admin/documents/{document_id}/reindex` | Re-run extraction/embedding for a document |
 | DELETE | `/admin/documents/{document_id}` | Delete a document and its chunks |
+
+## Admin — Business Documents (invoices, receipts, contracts, etc.)
+
+All under `/admin/business-documents`. See `BUSINESS_DOCUMENT_EXTRACTION.md` for the full pipeline design.
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/admin/business-documents/upload` | Multi-file upload (`files: list[UploadFile]`, ≤15/batch). Optional `?document_type=invoice` hint. Enqueues a Celery task per file; returns one result per file, including files that failed to even save. |
+| GET | `/admin/business-documents` | Paginated list, filterable by `document_type` and `status` |
+| GET | `/admin/business-documents/summary` | Per-type counts (total / needs review / failed) for a dashboard |
+| GET | `/admin/business-documents/{id}` | Full record incl. extracted data, confidence, validation |
+| PATCH | `/admin/business-documents/{id}` | `{ "fields": {...} }` — manual correction of one or more fields |
+| POST | `/admin/business-documents/{id}/reprocess` | Re-run extraction against the stored file |
+| DELETE | `/admin/business-documents/{id}` | Delete the record and its file |
+
+## Admin — Notifications
+
+All under `/admin/notifications`.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/admin/notifications` | Paginated list; `?unread_only=true` to filter |
+| GET | `/admin/notifications/unread-count` | Unread count for the bell badge |
+| POST | `/admin/notifications/{notification_id}/read` | Mark one notification read |
+| POST | `/admin/notifications/read-all` | Mark all notifications read |
+| DELETE | `/admin/notifications/{notification_id}` | Delete a notification |
 
 ## Admin — Chatbot Configuration
 

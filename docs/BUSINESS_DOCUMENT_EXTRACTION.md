@@ -1,5 +1,17 @@
 # Phase: Business Document Intelligence
 
+> ## ⚠️ Doc vs. code — read this first
+>
+> This document was written while the feature used a single generic `BusinessDocument` table (`business_documents`, with `extracted_data` stored as a JSON blob — see §2.1 below). **The code has since moved on to a normalized, per-document-type schema** and this doc wasn't fully updated to match. Specifically:
+>
+> - The live models are `app/models/business_documents/upload.py` (`BusinessDocumentUpload`, table `business_document_uploads`) plus one child table per type (`invoices`, `receipts`, `purchase_orders`, `resumes`, `expense_reports`, `application_forms`, `contracts`, plus their line-item tables) — see `DATABASE_ARCHITECTURE.md` for the full list. `app/services/business_documents/persistence.py` reads/writes these.
+> - `app/models/business_document.py` (singular, described in §2.1) is the **old** design. It's still in the tree and still has a live migration history, but current code (`service.py`, `extraction.py`, `routes/business_documents.py`, and `alembic/env.py`) doesn't use it as the source of truth anymore. A few lower-level helpers (`scoring.py`, `validation.py`, `field_schemas.py`) still import the `BusinessDocumentType` enum *from that old file* rather than from `business_documents/upload.py` — harmless today because the two enums have identical values, but worth reconciling.
+> - The migration referenced in §2.1 (`b1a1e6c9f3d2_business_documents.py`, chained on `65c81363ab75`) **does not match the actual migration files in this repo** — the real business-document migrations are `62d8b09cd61e_business_doc.py` and `5b541868256e_business_doc.py` (see `DATABASE_ARCHITECTURE.md` for the real chain).
+> - §2.3 describes the vision path as going through **OpenRouter** (`OPENROUTER_VISION_MODEL`, a vision-capable OpenRouter model). The live `LLMService` (`app/services/llm_service.py`) is OpenAI-only — `generate_json_with_image` uses `settings.openai_vision_model` (default `gpt-5.4-mini`) via the OpenAI SDK, not OpenRouter. Set `OPENAI_API_KEY`/`OPENAI_VISION_MODEL`, not `OPENROUTER_*`.
+> - §6 says `app/models/business_document.py` and one migration are the only new backend model files — in the current tree there are also the eight files under `app/models/business_documents/` and a second migration, as noted above.
+>
+> Everything else in this document — the field-schema-driven design in §2.2, the extraction/validation/scoring/orchestration flow in §2.3–§2.6, the API surface in §2.7, and the whole of §3 (frontend) — still accurately describes how the feature behaves; only the underlying storage shape and LLM provider have moved on from what's written below.
+
 **What this phase adds:** an AI pipeline that takes uploaded business documents
 (invoices, receipts, purchase orders, resumes, expense reports, application
 forms, contracts) and turns them into structured, validated, database-backed
@@ -366,9 +378,15 @@ case-sensitive filesystem): renamed `Adminlogin.jsx` → `AdminLogin.jsx` and
 
 ## 7. Setup checklist
 
-1. `alembic upgrade head` (creates the `business_documents` table).
-2. Set `OPENROUTER_API_KEY` and confirm/adjust `OPENROUTER_VISION_MODEL` in
-   `.env`.
-3. Restart the backend — no other migration/seed steps needed.
-4. In the admin panel: **Business management → Upload documents**, drop in
+1. `alembic upgrade head` (creates `business_document_uploads` and the
+   per-type tables — see the status note at the top of this doc for the
+   real migration IDs).
+2. Set `OPENAI_API_KEY` and confirm/adjust `OPENAI_MODEL`/`OPENAI_VISION_MODEL`
+   in `.env` (this pipeline is OpenAI-backed, not OpenRouter — see the
+   status note at the top of this doc).
+3. Make sure a Celery worker is running (`CELERY_SETUP.md`) — uploads are
+   processed via `process_business_document_task`, not inline; without a
+   worker they'll stay `pending`.
+4. Restart the backend — no other migration/seed steps needed.
+5. In the admin panel: **Business management → Upload documents**, drop in
    a few sample files, then check the matching type's table.
