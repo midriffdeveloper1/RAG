@@ -1,3 +1,15 @@
+"""
+The AI SQL & Data Analyst agent.
+
+Pipeline per question:
+
+    understand -> inspect schema -> generate SQL -> VALIDATE -> execute
+               -> analyze result -> natural-language answer (+ optional chart)
+
+Every step is recoverable: an out-of-scope question, an unsafe query, a SQL
+error, or an empty result each produce a useful reply rather than a stack trace.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -24,7 +36,7 @@ class ChartSpec:
 @dataclass
 class AnalystAnswer:
     answer: str
-    status: str  
+    status: str  # "ok" | "out_of_scope" | "needs_clarification" | "blocked" | "error"
     sql: str | None = None
     intent: str | None = None
     columns: list[str] = field(default_factory=list)
@@ -41,7 +53,13 @@ def _build_chart(
     columns: list[str],
     rows: list[list[Any]],
 ) -> ChartSpec | None:
-
+    """
+    Charts are the exception, not the default — most answers read better as a
+    sentence and a table. This is the second (and stricter) gate on top of the
+    prompt's own "default to none" instruction: even when the model asks for a
+    chart, we only actually draw one when the result genuinely has a shape
+    worth looking at.
+    """
     if plan.chart_type == "none":
         return None
 
@@ -57,19 +75,29 @@ def _build_chart(
         )
         return None
 
-    if len(rows) < 2:
+    # A trend needs at least 3 points to show direction; a comparison needs at
+    # least 3 categories to be worth a picture rather than just reading two
+    # numbers off the table. Two rows is exactly the case people complain
+    # about — a chart with two bars says nothing a sentence didn't already.
+    min_rows = 3
+    if len(rows) < min_rows:
         return None
 
     value_index = columns.index(value)
 
-    numeric_count = sum(
-        1
+    numeric_values = [
+        row[value_index]
         for row in rows
         if isinstance(row[value_index], (int, float)) and not isinstance(row[value_index], bool)
-    )
+    ]
 
-    
-    if numeric_count < max(2, int(len(rows) * 0.6)):
+    # Require most values to be numeric; a stray null shouldn't kill the chart.
+    if len(numeric_values) < max(3, int(len(rows) * 0.6)):
+        return None
+
+    # If every value is effectively the same, a chart just shows a flat line
+    # of identical bars — there's no shape to see, so it isn't worth drawing.
+    if max(numeric_values) - min(numeric_values) == 0:
         return None
 
     chart_type = plan.chart_type
@@ -80,6 +108,12 @@ def _build_chart(
 
 
 class AnalystService:
+    """
+    Note there is no `db` on this service. Query execution deliberately opens
+    its own read-only connection (see `executor.execute_readonly`) so that
+    agent-generated SQL never touches the request's session, which is holding
+    the uncommitted conversation records.
+    """
 
     def ask(
         self,
@@ -90,48 +124,53 @@ class AnalystService:
 
         if not question:
             return AnalystAnswer(
-                answer="Ask me a question about your business documents and I'll look it up.",
+                answer=(
+                    "What would you like to know? I can total things up, rank "
+                    "vendors or products, break spend down by category, or check "
+                    "what's expiring soon — just ask."
+                ),
                 status="needs_clarification",
             )
 
+        # --- 1. Understand + generate -------------------------------------
         try:
             plan = sql_generator.generate_sql_plan(question, history)
         except RuntimeError as exc:
+            # LLMService raises this when no API key is configured.
             raise
         except ValueError as exc:
             logger.warning("Analyst planning failed: %s", exc)
             return AnalystAnswer(
                 answer=(
-                    "I had trouble interpreting that question. Could you rephrase it, "
-                    "or be a bit more specific about which documents and time period "
-                    "you mean?"
+                    "Hmm, I'm not quite following that one — mind rephrasing it? "
+                    "It helps if you name a document type and roughly what time "
+                    "period you're interested in."
                 ),
                 status="error",
             )
 
         if not plan.in_scope:
-            reason = plan.refusal_reason or (
-                "I can only answer questions about your business documents."
+            # The prompt already asks the model for one warm, complete sentence
+            # that names what it *can* help with — appending the same list again
+            # would make it read like a form letter. Only add the fallback list
+            # when the model didn't give us a reason to work with.
+            answer = plan.refusal_reason or (
+                "That's a bit outside what I can help with — I only work with "
+                "your document records: invoices, receipts, purchase orders, "
+                "resumes, expense reports, application forms, and contracts."
             )
-            return AnalystAnswer(
-                answer=(
-                    f"{reason} I can help with invoices, receipts, purchase orders, "
-                    "resumes, expense reports, application forms, and contracts."
-                ),
-                status="out_of_scope",
-            )
+            return AnalystAnswer(answer=answer, status="out_of_scope")
 
         if plan.clarification and not plan.sql:
             return AnalystAnswer(answer=plan.clarification, status="needs_clarification")
 
         if not plan.sql:
             return AnalystAnswer(
-                answer=(
-                    "I wasn't able to turn that into a specific query. Could you rephrase it?"
-                ),
+                answer="I couldn't quite turn that into a lookup — could you say it a different way?",
                 status="error",
             )
 
+        # --- 2. Validate + 3. Execute (with one repair attempt) -----------
         attempt = 0
         last_error: str | None = None
         current_sql = plan.sql
@@ -148,9 +187,10 @@ class AnalystService:
                 )
                 return AnalystAnswer(
                     answer=(
-                        "I can't run that query — it falls outside what this assistant is "
-                        "allowed to do. I can only read from your business document tables, "
-                        "and I can't modify any data."
+                        "I had to stop myself there — that one either reached for data "
+                        "outside your document records or wanted to change something, "
+                        "and I only ever read from invoices, receipts, and the rest. "
+                        "Try rephrasing it and I'll take another pass."
                     ),
                     status="blocked",
                     intent=plan.intent,
@@ -167,10 +207,10 @@ class AnalystService:
                     logger.warning("Analyst query failed after repair: %s", last_error)
                     return AnalystAnswer(
                         answer=(
-                            "I built a query for that but it didn't run successfully. "
-                            "This usually means the data isn't in the shape the question "
-                            "assumes. Try narrowing it down — for example, naming a "
-                            "specific document type or date range."
+                            "I put together a query for that, but it didn't come back "
+                            "cleanly — usually that means the data isn't shaped quite "
+                            "the way the question assumes. Try narrowing it a bit, "
+                            "like naming a specific document type or date range."
                         ),
                         status="error",
                         sql=guarded.sql,
@@ -183,16 +223,14 @@ class AnalystService:
 
                 if not repaired:
                     return AnalystAnswer(
-                        answer=(
-                            "I couldn't build a working query for that question. "
-                            "Could you rephrase it?"
-                        ),
+                        answer="I couldn't quite land that one — could you try phrasing it differently?",
                         status="error",
                         intent=plan.intent,
                     )
 
                 current_sql = repaired
 
+        # --- 4. Analyze + 5. Answer ---------------------------------------
         try:
             answer_text = sql_generator.generate_answer(
                 question=question,
@@ -201,7 +239,7 @@ class AnalystService:
                 rows=result.rows,
                 truncated=result.truncated,
             )
-        except Exception as exc:  
+        except Exception as exc:  # noqa: BLE001 - never lose a good result to a bad summary
             logger.warning("Answer generation failed, falling back: %s", exc)
             answer_text = self._fallback_answer(result.columns, result.rows)
 
@@ -248,6 +286,11 @@ class AnalystService:
 
     @staticmethod
     def _repair_hint(error: str) -> str:
+        """
+        Postgres error messages say what's invalid but not what's valid, so a
+        blind retry tends to repeat the same class of mistake. These hints
+        supply the missing half.
+        """
         lowered = error.lower()
 
         if "invalid input value for enum" in lowered:
@@ -276,10 +319,11 @@ class AnalystService:
 
     @staticmethod
     def _fallback_answer(columns: list[str], rows: list[list[Any]]) -> str:
+        """Deterministic answer used when the summarising LLM call fails."""
         if not rows:
-            return "No matching documents were found for that question."
+            return "Came up empty — nothing matched that."
 
         if len(rows) == 1 and len(columns) == 1:
             return f"{columns[0].replace('_', ' ').capitalize()}: {rows[0][0]}"
 
-        return f"Found {len(rows)} matching row(s). The details are in the table below."
+        return f"Found {len(rows)} matching record(s) — take a look below."

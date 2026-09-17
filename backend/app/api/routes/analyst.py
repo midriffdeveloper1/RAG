@@ -24,36 +24,22 @@ from app.services.analyst.analyst_service import AnalystService
 
 logger = logging.getLogger(__name__)
 
-# Admin-only by construction: every route depends on get_current_admin, and
-# there is deliberately no public/customer-facing counterpart to this router.
 router = APIRouter(prefix="/admin/analyst", tags=["Admin Data Analyst"])
 
 HISTORY_TURNS = 8
 
 SUGGESTIONS = [
     SuggestedQuestion(
-        label="Invoice totals last month",
-        question="How many invoices did we receive last month and what was their total value?",
-    ),
-    SuggestedQuestion(
-        label="Top vendors",
-        question="Which vendor has invoiced us the most in the last 6 months?",
-    ),
-    SuggestedQuestion(
-        label="Top products by revenue",
-        question="Which product generated the most revenue across all invoices in the last 6 months?",
-    ),
-    SuggestedQuestion(
-        label="Expenses by category",
-        question="What is our total expense amount by category this year?",
-    ),
-    SuggestedQuestion(
-        label="Contracts expiring",
-        question="Which contracts expire in the next 90 days?",
+        label="Invoicing last month",
+        question="How did our invoicing look last month — how many, and what came in?",
     ),
     SuggestedQuestion(
         label="Candidate pipeline",
-        question="How many resumes have we received, and what are the most common skills?",
+        question="What does our candidate pipeline look like — how many resumes, and what skills stand out?",
+    ),
+    SuggestedQuestion(
+        label="Contracts coming up",
+        question="Any contracts coming up for renewal soon?",
     ),
 ]
 
