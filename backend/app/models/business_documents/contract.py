@@ -15,16 +15,16 @@ class Contract(Base):
         ForeignKey("business_document_uploads.id", ondelete="CASCADE"), unique=True, nullable=False
     )
 
-    contract_title: Mapped[str] = mapped_column(String(255), nullable=True)
-    contract_type: Mapped[str] = mapped_column(String(120), nullable=True)
-    party_a: Mapped[str] = mapped_column(String(255), nullable=True)
-    party_b: Mapped[str] = mapped_column(String(255), nullable=True)
-    effective_date: Mapped[str] = mapped_column(String(20), nullable=True)
-    expiration_date: Mapped[str] = mapped_column(String(20), nullable=True)
+    contract_title: Mapped[str] = mapped_column(Text, nullable=True)
+    contract_type: Mapped[str] = mapped_column(Text, nullable=True)
+    party_a: Mapped[str] = mapped_column(Text, nullable=True)
+    party_b: Mapped[str] = mapped_column(Text, nullable=True)
+    effective_date: Mapped[str] = mapped_column(Text, nullable=True)
+    expiration_date: Mapped[str] = mapped_column(Text, nullable=True)
     contract_value: Mapped[float] = mapped_column(Float, nullable=True)
-    currency: Mapped[str] = mapped_column(String(10), nullable=True)
+    currency: Mapped[str] = mapped_column(Text, nullable=True)
     key_terms: Mapped[list] = mapped_column(JSON, nullable=True)  # list[str]
-    governing_law: Mapped[str] = mapped_column(String(255), nullable=True)
+    governing_law: Mapped[str] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -47,7 +47,7 @@ class ContractSignatory(Base):
     contract_id: Mapped[str] = mapped_column(ForeignKey("contracts.id", ondelete="CASCADE"), nullable=False)
     position: Mapped[int] = mapped_column(Integer, default=0)
 
-    name: Mapped[str] = mapped_column(String(255), nullable=True)
-    role: Mapped[str] = mapped_column(String(120), nullable=True)
+    name: Mapped[str] = mapped_column(Text, nullable=True)
+    role: Mapped[str] = mapped_column(Text, nullable=True)
 
     contract = relationship("Contract", back_populates="signatories")

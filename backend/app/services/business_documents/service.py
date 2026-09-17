@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import UploadFile
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -166,8 +167,10 @@ class BusinessDocumentService:
 
         except Exception as exc:
             logger.exception("Failed to process business_document_id=%s", document.id)
+            self.db.rollback()
+            self.db.refresh(document)
             document.status = BusinessDocumentStatus.FAILED
-            document.error_message = str(exc)
+            document.error_message = _describe_error(exc)
 
         self.db.commit()
         self.db.refresh(document)
@@ -192,7 +195,6 @@ class BusinessDocumentService:
 
         raise ValueError(f"Unsupported file type for extraction: {document.file_type}")
 
-    # ---- Corrections / lifecycle (Admin CRUD) ---------------------------
 
     def apply_manual_correction(
         self, document: BusinessDocumentUpload, field_updates: dict
@@ -239,3 +241,24 @@ class BusinessDocumentService:
             file_path.unlink()
         self.db.delete(document)  # cascades to the type-specific row + its children
         self.db.commit()
+
+
+_MAX_ERROR_MESSAGE_LENGTH = 500
+
+
+def _describe_error(exc: Exception) -> str:
+   
+    if isinstance(exc, SQLAlchemyError):
+        return (
+            "Something about the extracted data didn't fit the database as-is "
+            f"({type(getattr(exc, 'orig', exc)).__name__}). This has been logged "
+            "for review — try reprocessing, and if it keeps happening the "
+            "document may need a manual look."
+        )
+
+    message = str(exc).strip() or type(exc).__name__
+
+    if len(message) > _MAX_ERROR_MESSAGE_LENGTH:
+        message = message[:_MAX_ERROR_MESSAGE_LENGTH].rstrip() + "…"
+
+    return message

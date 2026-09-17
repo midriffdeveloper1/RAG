@@ -15,16 +15,16 @@ class Receipt(Base):
         ForeignKey("business_document_uploads.id", ondelete="CASCADE"), unique=True, nullable=False
     )
 
-    receipt_number: Mapped[str] = mapped_column(String(120), nullable=True)
-    merchant_name: Mapped[str] = mapped_column(String(255), nullable=True)
+    receipt_number: Mapped[str] = mapped_column(Text, nullable=True)
+    merchant_name: Mapped[str] = mapped_column(Text, nullable=True)
     merchant_address: Mapped[str] = mapped_column(Text, nullable=True)
-    transaction_date: Mapped[str] = mapped_column(String(20), nullable=True)
-    transaction_time: Mapped[str] = mapped_column(String(20), nullable=True)
+    transaction_date: Mapped[str] = mapped_column(Text, nullable=True)
+    transaction_time: Mapped[str] = mapped_column(Text, nullable=True)
     subtotal: Mapped[float] = mapped_column(Float, nullable=True)
     tax_amount: Mapped[float] = mapped_column(Float, nullable=True)
     total_amount: Mapped[float] = mapped_column(Float, nullable=True)
-    payment_method: Mapped[str] = mapped_column(String(80), nullable=True)
-    currency: Mapped[str] = mapped_column(String(10), nullable=True)
+    payment_method: Mapped[str] = mapped_column(Text, nullable=True)
+    currency: Mapped[str] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(

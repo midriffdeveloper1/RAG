@@ -15,17 +15,17 @@ class PurchaseOrder(Base):
         ForeignKey("business_document_uploads.id", ondelete="CASCADE"), unique=True, nullable=False
     )
 
-    po_number: Mapped[str] = mapped_column(String(120), nullable=True)
-    po_date: Mapped[str] = mapped_column(String(20), nullable=True)
-    vendor_name: Mapped[str] = mapped_column(String(255), nullable=True)
-    buyer_name: Mapped[str] = mapped_column(String(255), nullable=True)
-    delivery_date: Mapped[str] = mapped_column(String(20), nullable=True)
+    po_number: Mapped[str] = mapped_column(Text, nullable=True)
+    po_date: Mapped[str] = mapped_column(Text, nullable=True)
+    vendor_name: Mapped[str] = mapped_column(Text, nullable=True)
+    buyer_name: Mapped[str] = mapped_column(Text, nullable=True)
+    delivery_date: Mapped[str] = mapped_column(Text, nullable=True)
     delivery_address: Mapped[str] = mapped_column(Text, nullable=True)
     subtotal: Mapped[float] = mapped_column(Float, nullable=True)
     tax_amount: Mapped[float] = mapped_column(Float, nullable=True)
     total_amount: Mapped[float] = mapped_column(Float, nullable=True)
-    currency: Mapped[str] = mapped_column(String(10), nullable=True)
-    payment_terms: Mapped[str] = mapped_column(String(255), nullable=True)
+    currency: Mapped[str] = mapped_column(Text, nullable=True)
+    payment_terms: Mapped[str] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(

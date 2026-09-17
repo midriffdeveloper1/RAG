@@ -15,9 +15,9 @@ class Resume(Base):
         ForeignKey("business_document_uploads.id", ondelete="CASCADE"), unique=True, nullable=False
     )
 
-    candidate_name: Mapped[str] = mapped_column(String(255), nullable=True)
-    email: Mapped[str] = mapped_column(String(255), nullable=True)
-    phone: Mapped[str] = mapped_column(String(50), nullable=True)
+    candidate_name: Mapped[str] = mapped_column(Text, nullable=True)
+    email: Mapped[str] = mapped_column(Text, nullable=True)
+    phone: Mapped[str] = mapped_column(Text, nullable=True)
     address: Mapped[str] = mapped_column(Text, nullable=True)
     summary: Mapped[str] = mapped_column(Text, nullable=True)
     total_experience_years: Mapped[float] = mapped_column(Float, nullable=True)
@@ -51,11 +51,11 @@ class ResumeEducation(Base):
     resume_id: Mapped[str] = mapped_column(ForeignKey("resumes.id", ondelete="CASCADE"), nullable=False)
     position: Mapped[int] = mapped_column(Integer, default=0)
 
-    institution: Mapped[str] = mapped_column(String(255), nullable=True)
-    degree: Mapped[str] = mapped_column(String(255), nullable=True)
-    field: Mapped[str] = mapped_column(String(255), nullable=True)
-    start_date: Mapped[str] = mapped_column(String(20), nullable=True)
-    end_date: Mapped[str] = mapped_column(String(20), nullable=True)
+    institution: Mapped[str] = mapped_column(Text, nullable=True)
+    degree: Mapped[str] = mapped_column(Text, nullable=True)
+    field: Mapped[str] = mapped_column(Text, nullable=True)
+    start_date: Mapped[str] = mapped_column(Text, nullable=True)
+    end_date: Mapped[str] = mapped_column(Text, nullable=True)
 
     resume = relationship("Resume", back_populates="education")
 
@@ -67,10 +67,10 @@ class ResumeExperience(Base):
     resume_id: Mapped[str] = mapped_column(ForeignKey("resumes.id", ondelete="CASCADE"), nullable=False)
     position: Mapped[int] = mapped_column(Integer, default=0)
 
-    company: Mapped[str] = mapped_column(String(255), nullable=True)
-    title: Mapped[str] = mapped_column(String(255), nullable=True)
-    start_date: Mapped[str] = mapped_column(String(20), nullable=True)
-    end_date: Mapped[str] = mapped_column(String(20), nullable=True)
+    company: Mapped[str] = mapped_column(Text, nullable=True)
+    title: Mapped[str] = mapped_column(Text, nullable=True)
+    start_date: Mapped[str] = mapped_column(Text, nullable=True)
+    end_date: Mapped[str] = mapped_column(Text, nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=True)
 
     resume = relationship("Resume", back_populates="experience")

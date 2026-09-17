@@ -15,18 +15,18 @@ class Invoice(Base):
         ForeignKey("business_document_uploads.id", ondelete="CASCADE"), unique=True, nullable=False
     )
 
-    invoice_number: Mapped[str] = mapped_column(String(120), nullable=True)
-    invoice_date: Mapped[str] = mapped_column(String(20), nullable=True)  # normalized "YYYY-MM-DD" when parseable
-    due_date: Mapped[str] = mapped_column(String(20), nullable=True)
-    vendor_name: Mapped[str] = mapped_column(String(255), nullable=True)
+    invoice_number: Mapped[str] = mapped_column(Text, nullable=True)
+    invoice_date: Mapped[str] = mapped_column(Text, nullable=True)  # normalized "YYYY-MM-DD" when parseable
+    due_date: Mapped[str] = mapped_column(Text, nullable=True)
+    vendor_name: Mapped[str] = mapped_column(Text, nullable=True)
     vendor_address: Mapped[str] = mapped_column(Text, nullable=True)
-    customer_name: Mapped[str] = mapped_column(String(255), nullable=True)
+    customer_name: Mapped[str] = mapped_column(Text, nullable=True)
     customer_address: Mapped[str] = mapped_column(Text, nullable=True)
     subtotal: Mapped[float] = mapped_column(Float, nullable=True)
     tax_amount: Mapped[float] = mapped_column(Float, nullable=True)
     total_amount: Mapped[float] = mapped_column(Float, nullable=True)
-    currency: Mapped[str] = mapped_column(String(10), nullable=True)
-    payment_terms: Mapped[str] = mapped_column(String(255), nullable=True)
+    currency: Mapped[str] = mapped_column(Text, nullable=True)
+    payment_terms: Mapped[str] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(

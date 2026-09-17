@@ -15,13 +15,13 @@ class ApplicationForm(Base):
         ForeignKey("business_document_uploads.id", ondelete="CASCADE"), unique=True, nullable=False
     )
 
-    applicant_name: Mapped[str] = mapped_column(String(255), nullable=True)
-    email: Mapped[str] = mapped_column(String(255), nullable=True)
-    phone: Mapped[str] = mapped_column(String(50), nullable=True)
+    applicant_name: Mapped[str] = mapped_column(Text, nullable=True)
+    email: Mapped[str] = mapped_column(Text, nullable=True)
+    phone: Mapped[str] = mapped_column(Text, nullable=True)
     address: Mapped[str] = mapped_column(Text, nullable=True)
-    date_of_birth: Mapped[str] = mapped_column(String(20), nullable=True)
-    position_applied_for: Mapped[str] = mapped_column(String(255), nullable=True)
-    submission_date: Mapped[str] = mapped_column(String(20), nullable=True)
+    date_of_birth: Mapped[str] = mapped_column(Text, nullable=True)
+    position_applied_for: Mapped[str] = mapped_column(Text, nullable=True)
+    submission_date: Mapped[str] = mapped_column(Text, nullable=True)
     # Application forms vary too widely to model every possible field as a
     # column — whatever doesn't map to the named fields above lands here.
     additional_fields: Mapped[dict] = mapped_column(JSON, nullable=True)

@@ -15,15 +15,15 @@ class ExpenseReport(Base):
         ForeignKey("business_document_uploads.id", ondelete="CASCADE"), unique=True, nullable=False
     )
 
-    employee_name: Mapped[str] = mapped_column(String(255), nullable=True)
-    employee_id: Mapped[str] = mapped_column(String(80), nullable=True)
-    department: Mapped[str] = mapped_column(String(255), nullable=True)
-    report_date: Mapped[str] = mapped_column(String(20), nullable=True)
-    expense_period_start: Mapped[str] = mapped_column(String(20), nullable=True)
-    expense_period_end: Mapped[str] = mapped_column(String(20), nullable=True)
+    employee_name: Mapped[str] = mapped_column(Text, nullable=True)
+    employee_id: Mapped[str] = mapped_column(Text, nullable=True)
+    department: Mapped[str] = mapped_column(Text, nullable=True)
+    report_date: Mapped[str] = mapped_column(Text, nullable=True)
+    expense_period_start: Mapped[str] = mapped_column(Text, nullable=True)
+    expense_period_end: Mapped[str] = mapped_column(Text, nullable=True)
     total_amount: Mapped[float] = mapped_column(Float, nullable=True)
-    currency: Mapped[str] = mapped_column(String(10), nullable=True)
-    approver_name: Mapped[str] = mapped_column(String(255), nullable=True)
+    currency: Mapped[str] = mapped_column(Text, nullable=True)
+    approver_name: Mapped[str] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -48,8 +48,8 @@ class ExpenseReportItem(Base):
     )
     position: Mapped[int] = mapped_column(Integer, default=0)
 
-    date: Mapped[str] = mapped_column(String(20), nullable=True)
-    category: Mapped[str] = mapped_column(String(120), nullable=True)
+    date: Mapped[str] = mapped_column(Text, nullable=True)
+    category: Mapped[str] = mapped_column(Text, nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     amount: Mapped[float] = mapped_column(Float, nullable=True)
 
