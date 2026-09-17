@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, Download } from "../common/Icons.jsx";
+import { ChevronDown, Download, FileSpreadsheet } from "../common/Icons.jsx";
 import {
   alignmentFor,
   detectColumnType,
@@ -13,6 +13,7 @@ const INITIAL_VISIBLE_ROWS = 8;
 export default function AnalystResultTable({ columns, rows, truncated, rowCount }) {
   const [expanded, setExpanded] = useState(false);
   const [sort, setSort] = useState({ index: null, direction: "desc" });
+  const [revealed, setRevealed] = useState(false);
 
   const columnTypes = useMemo(
     () => columns.map((column, index) => detectColumnType(column, rows, index)),
@@ -29,8 +30,6 @@ export default function AnalystResultTable({ columns, rows, truncated, rowCount 
       const left = a[sort.index];
       const right = b[sort.index];
 
-      // Nulls always sort last regardless of direction — they're absence of
-      // data, not a low value, and burying them keeps the top of the table useful.
       if (left === null || left === undefined) return 1;
       if (right === null || right === undefined) return -1;
 
@@ -71,8 +70,6 @@ export default function AnalystResultTable({ columns, rows, truncated, rowCount 
 
   if (!columns?.length || !rows?.length) return null;
 
-  // A single value is a headline, not a table — showing a 1x1 grid with a
-  // header row would bury the answer the admin actually asked for.
   if (rows.length === 1 && columns.length === 1) {
     const type = columnTypes[0];
 
@@ -86,8 +83,6 @@ export default function AnalystResultTable({ columns, rows, truncated, rowCount 
     );
   }
 
-  // A single record reads better as a definition list than a one-row table
-  // the admin has to scroll sideways through.
   if (rows.length === 1 && columns.length > 1) {
     return (
       <div className="analyst-result">
@@ -105,6 +100,19 @@ export default function AnalystResultTable({ columns, rows, truncated, rowCount 
     );
   }
 
+  if (!revealed) {
+    return (
+      <div className="analyst-result">
+        <button type="button" className="analyst-reveal" onClick={() => setRevealed(true)}>
+          <FileSpreadsheet size={14} />
+          <span>
+            Show as table · {rowCount ?? rows.length} row{(rowCount ?? rows.length) === 1 ? "" : "s"}
+          </span>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="analyst-result">
       <div className="analyst-result__toolbar">
@@ -113,10 +121,15 @@ export default function AnalystResultTable({ columns, rows, truncated, rowCount 
           {truncated ? " (showing the first page of a larger result)" : ""}
         </span>
 
-        <button type="button" className="analyst-result__csv" onClick={downloadCsv}>
-          <Download size={14} />
-          <span>CSV</span>
-        </button>
+        <div className="analyst-result__actions">
+          <button type="button" className="analyst-result__csv" onClick={downloadCsv}>
+            <Download size={14} />
+            <span>CSV</span>
+          </button>
+          <button type="button" className="analyst-result__csv" onClick={() => setRevealed(false)}>
+            <span>Hide</span>
+          </button>
+        </div>
       </div>
 
       <div className="analyst-table__scroll">

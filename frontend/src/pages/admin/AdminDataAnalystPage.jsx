@@ -9,6 +9,13 @@ import {
   listAnalystSessions,
 } from "../../services/adminApi.js";
 
+const THINKING_PHRASES = [
+  "Let me pull that up…",
+  "One sec, checking…",
+  "Looking that up now…",
+  "Give me a moment…",
+];
+
 export default function AdminDataAnalystPage() {
   const [sessionId, setSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -18,6 +25,7 @@ export default function AdminDataAnalystPage() {
   const [question, setQuestion] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState(null);
+  const [thinkingPhrase, setThinkingPhrase] = useState(THINKING_PHRASES[0]);
 
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
@@ -52,9 +60,8 @@ export default function AdminDataAnalystPage() {
     setError(null);
     setQuestion("");
     setIsSending(true);
+    setThinkingPhrase(THINKING_PHRASES[Math.floor(Math.random() * THINKING_PHRASES.length)]);
 
-    // Show the admin's question immediately rather than waiting for the
-    // round-trip — the agent can take several seconds to plan and run SQL.
     const optimistic = {
       id: `pending-${Date.now()}`,
       role: "user",
@@ -185,32 +192,17 @@ export default function AdminDataAnalystPage() {
               </div>
 
               <h2>What would you like to know?</h2>
-              <p>
-                I can query your {scope?.document_types?.length ?? 7} document types and
-                answer with a summary, a table, and a chart where it helps.
-              </p>
-
-              {scope?.document_types?.length > 0 && (
-                <div className="analyst-welcome__scope">
-                  {scope.document_types.map((type) => (
-                    <span key={type} className="analyst-welcome__chip">
-                      {type}
-                    </span>
-                  ))}
-                </div>
-              )}
 
               {scope?.suggestions?.length > 0 && (
                 <div className="analyst-suggestions">
-                  {scope.suggestions.map((suggestion) => (
+                  {scope.suggestions.slice(0, 3).map((suggestion) => (
                     <button
                       key={suggestion.question}
                       type="button"
                       className="analyst-suggestion"
                       onClick={() => askSuggestion(suggestion.question)}
                     >
-                      <span className="analyst-suggestion__label">{suggestion.label}</span>
-                      <span className="analyst-suggestion__question">{suggestion.question}</span>
+                      {suggestion.question}
                     </button>
                   ))}
                 </div>
@@ -228,9 +220,7 @@ export default function AdminDataAnalystPage() {
                 <Loader2 size={15} className="analyst-spin" />
               </div>
               <div className="analyst-msg__body">
-                <p className="analyst-msg__thinking">
-                  Inspecting the schema, writing a query, and checking it&rsquo;s safe to run&hellip;
-                </p>
+                <p className="analyst-msg__thinking">{thinkingPhrase}</p>
               </div>
             </div>
           )}
@@ -249,8 +239,6 @@ export default function AdminDataAnalystPage() {
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
             onKeyDown={(event) => {
-              // Enter sends; Shift+Enter makes a newline, matching the chat
-              // conventions admins already know from the rest of the app.
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
                 handleSubmit();
