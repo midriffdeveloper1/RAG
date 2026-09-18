@@ -167,8 +167,10 @@ class BusinessDocumentService:
 
         except Exception as exc:
             logger.exception("Failed to process business_document_id=%s", document.id)
+           
             self.db.rollback()
             self.db.refresh(document)
+
             document.status = BusinessDocumentStatus.FAILED
             document.error_message = _describe_error(exc)
 
@@ -195,6 +197,7 @@ class BusinessDocumentService:
 
         raise ValueError(f"Unsupported file type for extraction: {document.file_type}")
 
+    # ---- Corrections / lifecycle (Admin CRUD) ---------------------------
 
     def apply_manual_correction(
         self, document: BusinessDocumentUpload, field_updates: dict
@@ -218,6 +221,26 @@ class BusinessDocumentService:
         document.status = (
             BusinessDocumentStatus.COMPLETED if is_valid else BusinessDocumentStatus.NEEDS_REVIEW
         )
+
+        self.db.commit()
+        self.db.refresh(document)
+        return document
+
+    def set_review_status(
+        self, document: BusinessDocumentUpload, new_status: BusinessDocumentStatus
+    ) -> BusinessDocumentUpload:
+     
+        if new_status not in (BusinessDocumentStatus.COMPLETED, BusinessDocumentStatus.NEEDS_REVIEW):
+            raise ValueError("Status can only be set to 'completed' or 'needs_review'.")
+
+        if document.status not in (BusinessDocumentStatus.COMPLETED, BusinessDocumentStatus.NEEDS_REVIEW):
+            raise ValueError(
+                f"Can't change status while the document is '{document.status.value}' — "
+                "wait for processing to finish, or reprocess it first."
+            )
+
+        document.status = new_status
+        document.reviewed = True
 
         self.db.commit()
         self.db.refresh(document)
@@ -247,7 +270,7 @@ _MAX_ERROR_MESSAGE_LENGTH = 500
 
 
 def _describe_error(exc: Exception) -> str:
-   
+
     if isinstance(exc, SQLAlchemyError):
         return (
             "Something about the extracted data didn't fit the database as-is "

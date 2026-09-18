@@ -2,12 +2,13 @@ import { useState } from "react";
 import {
   deleteBusinessDocument,
   reprocessBusinessDocument,
+  setBusinessDocumentStatus,
   updateBusinessDocument,
 } from "../../services/adminApi.js";
 import { getDocumentTypeConfig } from "../../config/businessDocumentTypes.js";
 import { formatDateTime, formatFileSize, humanizeFieldName } from "../../utils/businessDocuments.js";
 import Modal from "../common/Modal.jsx";
-import { AlertCircle, Pencil, RefreshCw, Save, Trash2 } from "../common/Icons.jsx";
+import { AlertCircle, CheckCircle2, Pencil, RefreshCw, RotateCcw, Save, Trash2 } from "../common/Icons.jsx";
 import { Spinner } from "../common/Spinner.jsx";
 import BusinessDocumentStatusBadge from "./BusinessDocumentStatusBadge.jsx";
 import ConfidenceMeter from "./ConfidenceMeter.jsx";
@@ -58,6 +59,20 @@ export default function BusinessDocumentDetailModal({ document, onClose, onChang
       onChanged?.(updated);
     } catch (err) {
       setActionError(err.response?.data?.detail || "Re-processing failed.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleStatusChange(nextStatus) {
+    setIsBusy(true);
+    setActionError(null);
+    try {
+      const updated = await setBusinessDocumentStatus(doc.id, nextStatus);
+      setDoc(updated);
+      onChanged?.(updated);
+    } catch (err) {
+      setActionError(err.response?.data?.detail || "Couldn't update the status.");
     } finally {
       setIsBusy(false);
     }
@@ -187,11 +202,47 @@ export default function BusinessDocumentDetailModal({ document, onClose, onChang
           </div>
         )}
 
+        {doc.status === "needs_review" && (
+          <p className="document-detail__hint">
+            Automatic checks flagged this as incomplete — usually because a field is empty. If
+            you&rsquo;ve looked it over and it&rsquo;s as complete as the source document allows (a
+            field that&rsquo;s simply blank on the original isn&rsquo;t an extraction error), you can
+            mark it complete yourself below.
+          </p>
+        )}
+
         <div className="document-detail__actions">
           <button type="button" className="icon-button" onClick={handleReprocess} disabled={isBusy}>
             {isBusy ? <Spinner size={14} /> : <RefreshCw size={14} />}
             Re-run extraction
           </button>
+
+          {doc.status === "needs_review" && (
+            <button
+              type="button"
+              className="icon-button icon-button--primary"
+              onClick={() => handleStatusChange("completed")}
+              disabled={isBusy}
+              title="Mark this record as reviewed and complete"
+            >
+              <CheckCircle2 size={14} />
+              Mark as complete
+            </button>
+          )}
+
+          {doc.status === "completed" && (
+            <button
+              type="button"
+              className="icon-button"
+              onClick={() => handleStatusChange("needs_review")}
+              disabled={isBusy}
+              title="Reopen this record for another look"
+            >
+              <RotateCcw size={14} />
+              Reopen for review
+            </button>
+          )}
+
           <button
             type="button"
             className="icon-button icon-button--danger"

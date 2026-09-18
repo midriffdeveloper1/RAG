@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -50,6 +50,10 @@ class BusinessDocumentListResponse(BaseModel):
 
 class BusinessDocumentUpdate(BaseModel):
     fields: dict[str, Any]
+
+
+class BusinessDocumentStatusUpdate(BaseModel):
+    status: Literal["completed", "needs_review"]
 
 
 class BusinessDocumentActionResponse(BaseModel):

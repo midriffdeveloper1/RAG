@@ -15,6 +15,7 @@ from app.schemas.business_document import (
     BusinessDocumentActionResponse,
     BusinessDocumentListResponse,
     BusinessDocumentOut,
+    BusinessDocumentStatusUpdate,
     BusinessDocumentSummaryResponse,
     BusinessDocumentUpdate,
     DocumentTypeSummary,
@@ -238,6 +239,22 @@ def update_business_document(
         )
     service = BusinessDocumentService(db)
     updated = service.apply_manual_correction(document, payload.fields)
+    return to_out(updated)
+
+
+@router.post("/{document_id}/status", response_model=BusinessDocumentOut)
+def set_business_document_status(
+    document_id: str,
+    payload: BusinessDocumentStatusUpdate,
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin),
+):
+    document = _get_document_or_404(document_id, db)
+    service = BusinessDocumentService(db)
+    try:
+        updated = service.set_review_status(document, BusinessDocumentStatus(payload.status))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return to_out(updated)
 
 

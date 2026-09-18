@@ -300,6 +300,11 @@ export async function updateBusinessDocument(documentId, fields) {
   return data;
 }
 
+export async function setBusinessDocumentStatus(documentId, status) {
+  const { data } = await apiClient.post(`/admin/business-documents/${documentId}/status`, { status });
+  return data;
+}
+
 export async function reprocessBusinessDocument(documentId) {
   const { data } = await apiClient.post(`/admin/business-documents/${documentId}/reprocess`);
   return data;
