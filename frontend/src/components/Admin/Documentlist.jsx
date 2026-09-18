@@ -5,6 +5,10 @@ import { FileText, RefreshCw, Trash2 } from "../common/Icons.jsx";
 import EmptyState from "../common/EmptyState.jsx";
 import Pagination from "../common/Pagination.jsx";
 import { LoadingState, Spinner } from "../common/Spinner.jsx";
+// Named formatDate locally, but it actually renders date+time — aliasing to
+// the shared formatDateTime keeps this call site's output identical while
+// fixing the naive-UTC timezone bug (see utils/time.js for why).
+import { formatDateTime as formatDate } from "../../utils/time.js";
 import StatusBadge from "./StatusBadge.jsx";
 
 const PAGE_SIZE = 10;
@@ -13,10 +17,6 @@ function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function formatDate(isoString) {
-  return new Date(isoString).toLocaleString();
 }
 
 export default function DocumentList({ reloadSignal = 0 }) {

@@ -8,16 +8,13 @@ import {
 import { AlertCircle, CheckCircle2, Trash2 } from "../common/Icons.jsx";
 import Modal from "../common/Modal.jsx";
 import { LoadingState, Spinner } from "../common/Spinner.jsx";
+import { formatDateTime } from "../../utils/time.js";
 
 const AGENT_LABELS = {
   knowledge: "Knowledge Agent",
   booking: "Booking Agent",
   support: "Support Agent",
 };
-
-function formatDateTime(isoString) {
-  return new Date(isoString).toLocaleString();
-}
 
 export default function ConversationModal({ sessionId, onClose, onResolved, onDeleted }) {
   const [session, setSession] = useState(null);

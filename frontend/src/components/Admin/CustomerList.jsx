@@ -5,13 +5,10 @@ import { Pencil, Plus, Trash2, Users } from "../common/Icons.jsx";
 import EmptyState from "../common/EmptyState.jsx";
 import Pagination from "../common/Pagination.jsx";
 import { LoadingState, Spinner } from "../common/Spinner.jsx";
+import { formatDate } from "../../utils/time.js";
 import CustomerModal from "./CustomerModal.jsx";
 
 const PAGE_SIZE = 10;
-
-function formatDate(isoString) {
-  return new Date(isoString).toLocaleDateString();
-}
 
 export default function CustomerList() {
   const [search, setSearch] = useState("");

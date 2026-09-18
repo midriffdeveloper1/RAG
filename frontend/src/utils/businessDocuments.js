@@ -1,3 +1,5 @@
+import { parseApiTimestamp } from "./time.js";
+
 export function humanizeFieldName(name) {
   return name
     .replace(/_/g, " ")
@@ -12,8 +14,8 @@ export function formatFileSize(bytes) {
 }
 
 export function formatDateTime(isoString) {
-  if (!isoString) return "—";
-  return new Date(isoString).toLocaleString();
+  const date = parseApiTimestamp(isoString);
+  return date ? date.toLocaleString() : "—";
 }
 
 export function formatConfidencePct(value) {
@@ -28,8 +30,6 @@ export function confidenceTier(value) {
   return "low";
 }
 
-// Picks a short "headline" value to show in the table row for a document
-// type, so the list is scannable without opening the detail view.
 const HEADLINE_FIELDS_BY_TYPE = {
   invoice: ["invoice_number", "vendor_name", "total_amount"],
   receipt: ["merchant_name", "total_amount"],

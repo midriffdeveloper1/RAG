@@ -7,12 +7,9 @@ import Pagination from "../../components/common/Pagination.jsx";
 import { LoadingState } from "../../components/common/Spinner.jsx";
 import StatusBadge from "../../components/Admin/StatusBadge.jsx";
 import ConversationModal from "../../components/Admin/ConversationModal.jsx";
+import { formatDateTime } from "../../utils/time.js";
 
 const PAGE_SIZE = 10;
-
-function formatDateTime(isoString) {
-  return new Date(isoString).toLocaleString();
-}
 
 export default function AdminConversationsPage() {
   const [needsHumanOnly, setNeedsHumanOnly] = useState(false);
