@@ -7,14 +7,14 @@ This README is the entry point. See the other docs in this folder for details:
 | Doc | Covers |
 |---|---|
 | [`PROJECT_STRUCTURE.md`](./docs/PROJECT_STRUCTURE.md) | Folder-by-folder tour of both the backend and frontend |
-| [`TECH_STACK.md`](./TECH_STACK.md) | Every major library/service used and why |
-| [`DATABASE_ARCHITECTURE.md`](./DATABASE_ARCHITECTURE.md) | Tables, relationships, migrations |
-| [`HOW_TO_RUN.md`](./HOW_TO_RUN.md) | Local setup, env vars, running the API, worker, and frontend |
-| [`VOICE_AND_TELEPHONY.md`](./VOICE_AND_TELEPHONY.md) | The real-time voice agent (browser) and phone-call (Exotel) integration in depth — **includes a current-status caveat, read it before assuming phone calls work** |
-| [`BUSINESS_DOCUMENT_EXTRACTION.md`](./BUSINESS_DOCUMENT_EXTRACTION.md) | The invoice/receipt/PO/resume/expense-report/application-form/contract extraction pipeline |
-| [`AI_DATA_ANALYST.md`](./AI_DATA_ANALYST.md) | The admin-only natural-language SQL & data analyst agent, and how destructive SQL is prevented |
-| [`CELERY_SETUP.md`](./CELERY_SETUP.md) | Background job processing (Celery + Redis) — required for uploads and emails to actually complete |
-| [`API_REFERENCE.md`](./API_REFERENCE.md) | Every REST/WebSocket endpoint, grouped by area |
+| [`TECH_STACK.md`](./docs/TECH_STACK.md) | Every major library/service used and why |
+| [`DATABASE_ARCHITECTURE.md`](./docs/DATABASE_ARCHITECTURE.md) | Tables, relationships, migrations |
+| [`HOW_TO_RUN.md`](./docs/HOW_TO_RUN.md) | Local setup, env vars, running the API, worker, and frontend |
+| [`VOICE_AND_TELEPHONY.md`](./docs/VOICE_AND_TELEPHONY.md) | The real-time voice agent (browser) and phone-call (Exotel) integration in depth — **includes a current-status caveat, read it before assuming phone calls work** |
+| [`BUSINESS_DOCUMENT_EXTRACTION.md`](./docs/BUSINESS_DOCUMENT_EXTRACTION.md) | The invoice/receipt/PO/resume/expense-report/application-form/contract extraction pipeline |
+| [`AI_DATA_ANALYST.md`](./docs/AI_DATA_ANALYST.md) | The admin-only natural-language SQL & data analyst agent, and how destructive SQL is prevented |
+| [`CELERY_SETUP.md`](./docs/CELERY_SETUP.md) | Background job processing (Celery + Redis) — required for uploads and emails to actually complete |
+| [`API_REFERENCE.md`](./docs/API_REFERENCE.md) | Every REST/WebSocket endpoint, grouped by area |
 
 ---
 
