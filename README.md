@@ -1,12 +1,12 @@
 # AI Support Agent
 
-A full-stack, multi-tenant-style **AI customer support platform** for a service business (built around a salon/spa, "Serenity Salon & Spa," but generic enough for any appointment-based business). It combines a **RAG knowledge base**, a **multi-agent LLM orchestrator**, **appointment booking**, a **real-time voice agent**, a **business-document intelligence pipeline** (invoices, receipts, contracts, resumes, etc.), and an **admin notifications system** — reachable from a browser, and (currently mid-migration back to working order — see Status) from a real phone call.
+A full-stack, multi-tenant-style **AI customer support platform** for a service business (generic enough for any appointment-based business). It combines a **RAG knowledge base**, a **multi-agent LLM orchestrator**, **appointment booking**, a **real-time voice agent**, a **business-document intelligence pipeline** (invoices, receipts, contracts, resumes, etc.), and an **admin notifications system** — reachable from a browser, and (currently mid-migration back to working order — see Status) from a real phone call.
 
 This README is the entry point. See the other docs in this folder for details:
 
 | Doc | Covers |
 |---|---|
-| [`PROJECT_STRUCTURE.md`](./PROJECT_STRUCTURE.md) | Folder-by-folder tour of both the backend and frontend |
+| [`PROJECT_STRUCTURE.md`](./docs/PROJECT_STRUCTURE.md) | Folder-by-folder tour of both the backend and frontend |
 | [`TECH_STACK.md`](./TECH_STACK.md) | Every major library/service used and why |
 | [`DATABASE_ARCHITECTURE.md`](./DATABASE_ARCHITECTURE.md) | Tables, relationships, migrations |
 | [`HOW_TO_RUN.md`](./HOW_TO_RUN.md) | Local setup, env vars, running the API, worker, and frontend |
